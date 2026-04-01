@@ -1,6 +1,6 @@
 [project]
 name = "one-skills-manager"
-version = "0.1.0"
+version = "1.0.0"
 description = "Manage and sync AI agent skills across Claude Code, Cursor, Windsurf, and Codex"
 readme = "README.md"
 requires-python = ">=3.13"
