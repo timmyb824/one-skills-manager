@@ -1,0 +1,66 @@
+repos:
+  - repo: https://github.com/sourcery-ai/sourcery
+    rev: v1.37.0
+    hooks:
+      - id: sourcery
+        # The best way to use Sourcery in a pre-commit hook:
+        # * review only changed lines:
+        # * omit the summary
+        args: [ --diff=git diff HEAD, --no-summary, one_skills_manager/ ]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+        args: [ --unsafe ]
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-added-large-files
+      - id: check-ast
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-xml
+      - id: debug-statements
+      - id: requirements-txt-fixer
+      - id: mixed-line-ending
+        args: [ "--fix=auto" ]
+
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+        language_version: python3
+
+  - repo: https://github.com/pycqa/isort
+    rev: 6.0.1
+    hooks:
+      - id: isort
+        args: [ "--profile", "black" ]
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.7.9
+    hooks:
+      - id: uv-lock
+      - id: uv-export
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: "v4.2.0"
+    hooks:
+      - id: conventional-pre-commit
+        stages: [ commit-msg ]
+        args: [ refactor, chore, build, ci, docs, feat, fix, test, perf, style, ":boom:" ]
+
+  - repo: https://github.com/sirwart/ripsecrets
+    rev: v0.1.11
+    hooks:
+      - id: ripsecrets
+
+  - repo: https://github.com/trufflesecurity/trufflehog
+    rev: v3.88.35
+    hooks:
+      - id: trufflehog
+        name: TruffleHog
+        description: Detect secrets in your data.
+        entry: bash -c 'trufflehog git file://. --since-commit HEAD --only-verified --fail'
+        language: system
+        stages: [ "pre-commit" ]

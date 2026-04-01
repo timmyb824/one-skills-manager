@@ -1,0 +1,98 @@
+name: Publish to PyPI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Run tests
+        run: uv run pytest tests/ -v
+
+  publish:
+    needs: test
+    environment:
+      name: production
+      url: https://pypi.org/project/airewrite/
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    name: Release
+    concurrency: Release
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install the project
+        run: uv sync --all-extras --dev
+
+      - name: Prepare package for release
+        id: package_release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          uv run semantic-release version
+          uv run semantic-release changelog
+          uv run semantic-release publish
+
+      - name: Check if dist folder has contents
+        id: check_dist
+        run: |
+          if [ -d "dist/" ] && [ "$(ls -A dist/)" ]; then
+            echo "DIST_EXISTS=true" >> $GITHUB_OUTPUT
+          else
+            echo "DIST_EXISTS=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish to TestPyPI
+        id: test_publish
+        if: steps.check_dist.outputs.DIST_EXISTS == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          verbose: true
+
+      - name: Test install from TestPyPI
+        if: steps.test_publish.outcome == 'success'
+        shell: bash
+        id: test_install
+        run: |
+          python -m pip install \
+          --index-url https://test.pypi.org/simple/ \
+          --extra-index-url https://pypi.org/simple \
+          airewrite
+
+      - name: Clean up attestation files
+        if: steps.test_install.outcome == 'success'
+        run: |
+          rm -f dist/*.publish.attestation
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        if: steps.test_install.outcome == 'success'
