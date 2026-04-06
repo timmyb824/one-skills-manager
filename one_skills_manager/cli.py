@@ -210,6 +210,66 @@ def profile_remove_server(server: str, profile: str | None) -> None:
         sys.exit(1)
 
 
+@profile_group.command("add-agent")
+@click.argument("agent")
+@click.option("--profile", default=None, help="Profile name (defaults to active)")
+@click.option("--disabled", is_flag=True, help="Add agent in disabled state")
+def profile_add_agent(agent: str, profile: str | None, disabled: bool) -> None:
+    """Add an agent to a profile."""
+    if agent not in AGENT_IDS:
+        err_console.print(f"[red]Unknown agent '{agent}'.[/red]")
+        err_console.print(f"Valid agents: {', '.join(AGENT_IDS)}")
+        sys.exit(1)
+
+    profiles = _load_profiles()
+    profile_name = profile or profiles.active_profile
+
+    if not profile_name:
+        err_console.print("[red]No active profile.[/red]")
+        sys.exit(1)
+
+    try:
+        from .profiles import AgentConfig
+
+        agent_config = AgentConfig(enabled=not disabled)
+        profiles.add_agent_to_profile(profile_name, agent, agent_config)
+        status = "disabled" if disabled else "enabled"
+        console.print(
+            f"[green]✓[/green] Added {agent} to profile {profile_name} ({status})"
+        )
+    except ValueError as exc:
+        err_console.print(f"[red]Error:[/red] {exc}")
+        sys.exit(1)
+
+
+@profile_group.command("remove-agent")
+@click.argument("agent")
+@click.option("--profile", default=None, help="Profile name (defaults to active)")
+def profile_remove_agent(agent: str, profile: str | None) -> None:
+    """Remove an agent from a profile."""
+    profiles = _load_profiles()
+    profile_name = profile or profiles.active_profile
+
+    if not profile_name:
+        err_console.print("[red]No active profile.[/red]")
+        sys.exit(1)
+
+    if profile_name not in profiles.profiles:
+        err_console.print(f"[red]Profile '{profile_name}' not found.[/red]")
+        sys.exit(1)
+
+    profile_obj = profiles.profiles[profile_name]
+    if agent not in profile_obj.agents:
+        err_console.print(
+            f"[red]Agent '{agent}' not in profile '{profile_name}'.[/red]"
+        )
+        sys.exit(1)
+
+    del profile_obj.agents[agent]
+    profiles.save()
+    console.print(f"[green]✓[/green] Removed {agent} from profile {profile_name}")
+
+
 @profile_group.command("show")
 @click.argument("name", required=False)
 def profile_show(name: str | None) -> None:
