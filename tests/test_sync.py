@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from one_skills_manager.agents import Agent
 from one_skills_manager.config import Config, SkillRecord
 from one_skills_manager.sync import _link_skill, sync_skill, unsync_skill
@@ -66,7 +64,11 @@ def test_sync_skill_creates_links(tmp_path: Path) -> None:
 
     original = agents_module.AGENTS.copy()
     agents_module.AGENTS["claude-code"] = Agent(
-        id="claude-code", name="Claude Code", skills_dir=agent_dir
+        id="claude-code",
+        name="Claude Code",
+        skills_dir=agent_dir,
+        rules_dir=agent_dir,
+        mcp_config_path=agent_dir,
     )
     try:
         _make_skill_dir(config, "my-skill")
@@ -92,7 +94,11 @@ def test_unsync_skill_removes_link(tmp_path: Path) -> None:
 
     original = agents_module.AGENTS.copy()
     agents_module.AGENTS["claude-code"] = Agent(
-        id="claude-code", name="Claude Code", skills_dir=agent_dir
+        id="claude-code",
+        name="Claude Code",
+        skills_dir=agent_dir,
+        rules_dir=agent_dir,
+        mcp_config_path=agent_dir,
     )
     try:
         skill_dir = _make_skill_dir(config, "my-skill")
@@ -103,7 +109,7 @@ def test_unsync_skill_removes_link(tmp_path: Path) -> None:
             name="my-skill", source="local", source_type="local", agents=["claude-code"]
         )
         config.add_skill(record)
-        result = unsync_skill(record, config, "claude-code")
+        result = unsync_skill(record, "claude-code")
         assert result.action == "removed"
         assert not link.exists()
     finally:

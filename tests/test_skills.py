@@ -1,6 +1,5 @@
 """Tests for skill install (local path only — GitHub requires network)."""
 
-import shutil
 from pathlib import Path
 
 import pytest
