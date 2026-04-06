@@ -1,9 +1,6 @@
 """Tests for config persistence."""
 
-import json
 from pathlib import Path
-
-import pytest
 
 from one_skills_manager.config import Config, SkillRecord
 

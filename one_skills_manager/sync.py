@@ -7,10 +7,17 @@ from pathlib import Path
 
 from .agents import get_agent
 from .config import Config, SkillRecord
+from .dryrun import DryRunCollector
+from .mcp import MCPConfig
+from .profiles import ProfileConfig
+from .renderers import claude_code, windsurf
+from .rules import sync_rule as sync_rule_impl
 
 
 @dataclass
 class SyncResult:
+    """Result of syncing a skill to an agent."""
+
     skill: str
     agent: str
     action: str  # "linked" | "updated" | "up-to-date" | "error"
@@ -89,7 +96,7 @@ def sync_all(config: Config, agent_filter: str | None = None) -> list[SyncResult
     return results
 
 
-def unsync_skill(record: SkillRecord, config: Config, agent_id: str) -> SyncResult:
+def unsync_skill(record: SkillRecord, agent_id: str) -> SyncResult:
     """Remove the symlink for a specific agent."""
     try:
         agent = get_agent(agent_id)
@@ -108,3 +115,130 @@ def unsync_skill(record: SkillRecord, config: Config, agent_id: str) -> SyncResu
         action="not-linked",
         detail="no symlink found",
     )
+
+
+def sync_rules_all(
+    config: Config,
+    agent_filter: str | None = None,
+    dry_run: bool = False,
+    collector: DryRunCollector | None = None,
+) -> list[SyncResult]:
+    """Sync all rules to their assigned agents."""
+    results: list[SyncResult] = []
+
+    for rule_record in config.rules.values():
+        agents_to_sync = [agent_filter] if agent_filter else rule_record.agents
+
+        for agent_id in agents_to_sync:
+            try:
+                agent = get_agent(agent_id)
+                action = sync_rule_impl(rule_record.name, agent_id, config, dry_run)
+
+                if dry_run and collector:
+                    rule_path = config.rules_dir / rule_record.name
+                    target_path = agent.rules_dir / rule_record.name
+                    if "would-link" in action:
+                        collector.add_symlink(
+                            str(rule_path), str(target_path), "create"
+                        )
+                    elif "would-update" in action:
+                        collector.add_symlink(
+                            str(rule_path), str(target_path), "update"
+                        )
+
+                results.append(
+                    SyncResult(skill=rule_record.name, agent=agent_id, action=action)
+                )
+            except Exception as exc:  # noqa: BLE001
+                results.append(
+                    SyncResult(
+                        skill=rule_record.name,
+                        agent=agent_id,
+                        action="error",
+                        detail=str(exc),
+                    )
+                )
+
+    return results
+
+
+def sync_mcp_servers(
+    profile_config: ProfileConfig,
+    mcp_config: MCPConfig,
+    agent_id: str,
+    dry_run: bool = False,
+    collector: DryRunCollector | None = None,
+) -> SyncResult:
+    """Sync MCP servers for a specific agent based on active profile."""
+    profile = profile_config.get_active_profile()
+    if not profile:
+        return SyncResult(
+            skill="mcp-servers",
+            agent=agent_id,
+            action="error",
+            detail="No active profile",
+        )
+
+    if agent_id not in profile.agents or not profile.agents[agent_id].enabled:
+        return SyncResult(
+            skill="mcp-servers",
+            agent=agent_id,
+            action="skipped",
+            detail="Agent not enabled in profile",
+        )
+
+    try:
+        agent = get_agent(agent_id)
+
+        if errors := mcp_config.validate_profile_servers(profile.mcp_servers):
+            return SyncResult(
+                skill="mcp-servers",
+                agent=agent_id,
+                action="error",
+                detail="; ".join(errors),
+            )
+
+        # Select renderer based on agent type
+        if agent_id == "windsurf":
+            renderer = windsurf
+        else:
+            # Default to claude_code renderer (works for claude-code, cursor, codex)
+            renderer = claude_code
+
+        # Render MCP config with agent-specific transport resolution
+        mcp_servers_config = renderer.render_mcp_config(
+            profile, mcp_config, agent_id=agent_id
+        )
+
+        # Merge with existing config
+        merged_config, backup_path = renderer.merge_with_existing(
+            mcp_servers_config, agent.mcp_config_path, dry_run
+        )
+
+        if dry_run and collector:
+            if backup_path:
+                collector.add_backup(str(agent.mcp_config_path), backup_path)
+
+            server_list = ", ".join(profile.mcp_servers.keys())
+            collector.add_file_modification(
+                str(agent.mcp_config_path),
+                f"Add/update {len(profile.mcp_servers)} MCP servers: {server_list}",
+            )
+
+        # Write config
+        renderer.write_config(merged_config, agent.mcp_config_path, dry_run)
+
+        action = "would-update" if dry_run else "updated"
+        detail = f"{len(profile.mcp_servers)} servers configured"
+
+        return SyncResult(
+            skill="mcp-servers", agent=agent_id, action=action, detail=detail
+        )
+
+    except Exception as exc:  # noqa: BLE001
+        return SyncResult(
+            skill="mcp-servers",
+            agent=agent_id,
+            action="error",
+            detail=str(exc),
+        )

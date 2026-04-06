@@ -1,0 +1,5 @@
+[MESSAGES CONTROL]
+
+# --disable=W".
+disable=import-outside-toplevel,
+        line-too-long
