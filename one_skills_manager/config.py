@@ -13,6 +13,38 @@ SKILLS_DIR = DEFAULT_HOME / "skills"
 RULES_DIR = DEFAULT_HOME / "rules"
 
 
+def path_to_portable(path: Path) -> str:
+    """Convert an absolute path to a portable format using ~/ if under home.
+
+    Args:
+        path: Absolute path to convert
+
+    Returns:
+        String path with ~/ prefix if under home directory, otherwise absolute
+    """
+    try:
+        home = Path.home()
+        # Check if path is under home directory
+        path.relative_to(home)
+        # Convert to string with ~/ prefix
+        return str(Path("~") / path.relative_to(home))
+    except ValueError:
+        # Path is not under home directory, return as absolute
+        return str(path)
+
+
+def portable_to_path(path_str: str) -> Path:
+    """Convert a portable path string to an absolute Path.
+
+    Args:
+        path_str: Path string, possibly with ~/ prefix
+
+    Returns:
+        Absolute Path with ~ expanded
+    """
+    return Path(path_str).expanduser()
+
+
 @dataclass
 class SkillRecord:
     """Record of a skill in the configuration."""
@@ -24,9 +56,18 @@ class SkillRecord:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the SkillRecord to a dictionary."""
+        # Convert source to portable format if it's a local path
+        source = self.source
+        if self.source_type == "local":
+            try:
+                source = path_to_portable(Path(self.source))
+            except Exception:  # noqa: BLE001
+                # If conversion fails, keep original
+                pass
+
         return {
             "name": self.name,
-            "source": self.source,
+            "source": source,
             "source_type": self.source_type,
             "agents": self.agents,
         }
@@ -52,9 +93,17 @@ class RuleRecord:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the RuleRecord to a dictionary."""
+        # Convert source to portable format if it's a local path
+        source = self.source
+        try:
+            source = path_to_portable(Path(self.source))
+        except Exception:  # noqa: BLE001
+            # If conversion fails, keep original
+            pass
+
         return {
             "name": self.name,
-            "source": self.source,
+            "source": source,
             "agents": self.agents,
         }
 
@@ -84,9 +133,9 @@ class Config:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "version": "1",
-            "skills_dir": str(self.skills_dir),
+            "skills_dir": path_to_portable(self.skills_dir),
             "skills": {name: rec.to_dict() for name, rec in self.skills.items()},
-            "rules_dir": str(self.rules_dir),
+            "rules_dir": path_to_portable(self.rules_dir),
             "rules": {name: rec.to_dict() for name, rec in self.rules.items()},
         }
         self._path.write_text(json.dumps(data, indent=2))
@@ -101,12 +150,12 @@ class Config:
             return cfg
         data = json.loads(path.read_text())
         cfg = cls(
-            skills_dir=Path(data.get("skills_dir", str(SKILLS_DIR))),
+            skills_dir=portable_to_path(data.get("skills_dir", str(SKILLS_DIR))),
             skills={
                 name: SkillRecord.from_dict(rec)
                 for name, rec in data.get("skills", {}).items()
             },
-            rules_dir=Path(data.get("rules_dir", str(RULES_DIR))),
+            rules_dir=portable_to_path(data.get("rules_dir", str(RULES_DIR))),
             rules={
                 name: RuleRecord.from_dict(rec)
                 for name, rec in data.get("rules", {}).items()
