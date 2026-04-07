@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.4.0 (2026-04-07)
+
+### Features
+
+- **cursor**: Add full support for Cursor agent import and sync
+  ([`9f924df`](https://github.com/timmyb824/one-skills-manager/commit/9f924df8a1d2a0dd7d941ae37f9fcb04e7d1a38d))
+
+
 ## v1.3.0 (2026-04-07)
 
 ### Features
