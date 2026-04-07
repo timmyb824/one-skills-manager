@@ -1061,27 +1061,44 @@ def cmd_sync(
 
     all_results = []
 
-    # Sync skills
+    # Determine which agents to sync to
+    agents_to_sync = []
+    if agent:
+        # Explicit agent specified
+        agents_to_sync = [agent]
+    elif profile := profiles.get_active_profile():
+        # Use agents from active profile
+        agents_to_sync = [
+            agent_id
+            for agent_id, agent_cfg in profile.agents.items()
+            if agent_cfg.enabled
+        ]
+
+    if not agents_to_sync:
+        console.print(
+            "[yellow]No agents to sync. Add agents to your profile first.[/yellow]"
+        )
+        return
+
+    # Sync skills to profile agents only
     if not rules_only and not mcp_only:
-        results = sync_all(config, agent_filter=agent)
-        all_results.extend(results)
+        for agent_id in agents_to_sync:
+            results = sync_all(config, agent_filter=agent_id)
+            all_results.extend(results)
 
-    # Sync rules
+    # Sync rules to profile agents only
     if not skills_only and not mcp_only:
-        results = sync_rules_all(config, agent, dry_run, collector)
-        all_results.extend(results)
+        for agent_id in agents_to_sync:
+            results = sync_rules_all(config, agent_id, dry_run, collector)
+            all_results.extend(results)
 
+    # Sync MCP servers to profile agents only
     if not skills_only and not rules_only:
-        if agent:
-            result = sync_mcp_servers(profiles, mcp_config, agent, dry_run, collector)
+        for agent_id in agents_to_sync:
+            result = sync_mcp_servers(
+                profiles, mcp_config, agent_id, dry_run, collector
+            )
             all_results.append(result)
-        elif profile := profiles.get_active_profile():
-            for agent_id, agent_cfg in profile.agents.items():
-                if agent_cfg.enabled:
-                    result = sync_mcp_servers(
-                        profiles, mcp_config, agent_id, dry_run, collector
-                    )
-                    all_results.append(result)
 
     # Display results
     if dry_run and collector:
