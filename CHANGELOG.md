@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.4.3 (2026-04-07)
+
+### Bug Fixes
+
+- **sync**: Ensure agent_filter syncs correctly with agents
+  ([`4e5e9c9`](https://github.com/timmyb824/one-skills-manager/commit/4e5e9c9d8284b17abb0af0cd73ff6a7f089ed01f))
+
+
 ## v1.4.2 (2026-04-07)
 
 ### Bug Fixes
