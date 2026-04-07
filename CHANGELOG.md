@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.4.1 (2026-04-07)
+
+### Chores
+
+- **config**: Add portable path handling and ignore windsurf directory
+  ([`81b07bc`](https://github.com/timmyb824/one-skills-manager/commit/81b07bca15de25d6813d6d7c69196c028458e340))
+
+
 ## v1.4.0 (2026-04-07)
 
 ### Features
