@@ -313,6 +313,13 @@ def profile_show(name: str | None) -> None:
             for server, transport in overrides.items():
                 console.print(f"    • {server} → {transport}")
 
+    if profile.agent_exclusions:
+        console.print("\n[bold]Agent-Specific Server Exclusions:[/bold]")
+        for agent_id, exclusions in profile.agent_exclusions.items():
+            console.print(f"  [cyan]{agent_id}:[/cyan]")
+            for server in exclusions:
+                console.print(f"    • {server} [dim](excluded)[/dim]")
+
 
 @profile_group.command("set-override")
 @click.argument("agent")
@@ -364,6 +371,56 @@ def profile_remove_override(agent: str, server: str, profile: str | None) -> Non
     try:
         profiles.remove_agent_override(profile_name, agent, server)
         console.print(f"[green]✓[/green] Removed override for {agent}: {server}")
+    except ValueError as exc:
+        err_console.print(f"[red]Error:[/red] {exc}")
+        sys.exit(1)
+
+
+@profile_group.command("exclude-server")
+@click.argument("agent")
+@click.argument("server")
+@click.option("--profile", default=None, help="Profile name (defaults to active)")
+def profile_exclude_server(agent: str, server: str, profile: str | None) -> None:
+    """Exclude a server from a specific agent.
+
+    Use this when an agent has a built-in version of a server or you don't
+    want a specific server to sync to a specific agent.
+    """
+    profiles = _load_profiles()
+    profile_name = profile or profiles.active_profile
+
+    if not profile_name:
+        err_console.print("[red]No active profile.[/red]")
+        sys.exit(1)
+
+    if agent not in AGENT_IDS:
+        err_console.print(f"[red]Unknown agent '{agent}'.[/red]")
+        sys.exit(1)
+
+    try:
+        profiles.exclude_server_from_agent(profile_name, agent, server)
+        console.print(f"[green]✓[/green] Excluded {server} from {agent}")
+    except ValueError as exc:
+        err_console.print(f"[red]Error:[/red] {exc}")
+        sys.exit(1)
+
+
+@profile_group.command("include-server")
+@click.argument("agent")
+@click.argument("server")
+@click.option("--profile", default=None, help="Profile name (defaults to active)")
+def profile_include_server(agent: str, server: str, profile: str | None) -> None:
+    """Remove a server exclusion for a specific agent."""
+    profiles = _load_profiles()
+    profile_name = profile or profiles.active_profile
+
+    if not profile_name:
+        err_console.print("[red]No active profile.[/red]")
+        sys.exit(1)
+
+    try:
+        profiles.include_server_for_agent(profile_name, agent, server)
+        console.print(f"[green]✓[/green] Included {server} for {agent}")
     except ValueError as exc:
         err_console.print(f"[red]Error:[/red] {exc}")
         sys.exit(1)

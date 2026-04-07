@@ -40,23 +40,45 @@ class Profile:
 
     Agent overrides allow specifying different transports for specific agents
     when they don't support the default transport for a server.
+
+    Agent exclusions allow excluding specific servers from specific agents
+    (e.g., when an agent has a built-in version of that server).
     """
 
     name: str
     mcp_servers: dict[str, str] = field(default_factory=dict)
     agents: dict[str, AgentConfig] = field(default_factory=dict)
     agent_overrides: dict[str, dict[str, str]] = field(default_factory=dict)
+    agent_exclusions: dict[str, list[str]] = field(default_factory=dict)
 
-    def get_transport_for_agent(self, server_name: str, agent_id: str) -> str | None:
-        """Get the transport for a server, checking agent overrides first.
+    def is_server_excluded(self, server_name: str, agent_id: str) -> bool:
+        """Check if a server is excluded for a specific agent.
 
         Args:
             server_name: Name of the MCP server
             agent_id: ID of the agent
 
         Returns:
-            Transport name, or None if server not in profile
+            True if server is excluded for this agent
         """
+        if agent_id in self.agent_exclusions:
+            return server_name in self.agent_exclusions[agent_id]
+        return False
+
+    def get_transport_for_agent(self, server_name: str, agent_id: str) -> str | None:
+        """Get the transport for a server, checking exclusions and overrides.
+
+        Args:
+            server_name: Name of the MCP server
+            agent_id: ID of the agent
+
+        Returns:
+            Transport name, or None if server not in profile or excluded
+        """
+        # Check if server is excluded for this agent
+        if self.is_server_excluded(server_name, agent_id):
+            return None
+
         # Check agent-specific override first
         if (
             agent_id in self.agent_overrides
@@ -77,6 +99,9 @@ class Profile:
         # Only include agent_overrides if not empty
         if self.agent_overrides:
             data["agent_overrides"] = self.agent_overrides
+        # Only include agent_exclusions if not empty
+        if self.agent_exclusions:
+            data["agent_exclusions"] = self.agent_exclusions
         return data
 
     @classmethod
@@ -90,6 +115,7 @@ class Profile:
                 for aid, cfg in data.get("agents", {}).items()
             },
             agent_overrides=data.get("agent_overrides", {}),
+            agent_exclusions=data.get("agent_exclusions", {}),
         )
 
 
@@ -230,5 +256,54 @@ class ProfileConfig:
             # Clean up empty agent override dicts
             if not profile.agent_overrides[agent_id]:
                 del profile.agent_overrides[agent_id]
+
+        self.save()
+
+    def exclude_server_from_agent(
+        self, profile_name: str, agent_id: str, server_name: str
+    ) -> None:
+        """Exclude a server from a specific agent.
+
+        Args:
+            profile_name: Name of the profile
+            agent_id: ID of the agent
+            server_name: Name of the MCP server to exclude
+        """
+        if profile_name not in self.profiles:
+            raise ValueError(f"Profile '{profile_name}' does not exist")
+
+        profile = self.profiles[profile_name]
+
+        # Ensure agent_exclusions list exists for this agent
+        if agent_id not in profile.agent_exclusions:
+            profile.agent_exclusions[agent_id] = []
+
+        # Add server to exclusion list if not already there
+        if server_name not in profile.agent_exclusions[agent_id]:
+            profile.agent_exclusions[agent_id].append(server_name)
+
+        self.save()
+
+    def include_server_for_agent(
+        self, profile_name: str, agent_id: str, server_name: str
+    ) -> None:
+        """Remove a server exclusion for a specific agent.
+
+        Args:
+            profile_name: Name of the profile
+            agent_id: ID of the agent
+            server_name: Name of the MCP server to include
+        """
+        if profile_name not in self.profiles:
+            raise ValueError(f"Profile '{profile_name}' does not exist")
+
+        profile = self.profiles[profile_name]
+
+        if agent_id in profile.agent_exclusions:
+            if server_name in profile.agent_exclusions[agent_id]:
+                profile.agent_exclusions[agent_id].remove(server_name)
+            # Clean up empty agent exclusion lists
+            if not profile.agent_exclusions[agent_id]:
+                del profile.agent_exclusions[agent_id]
 
         self.save()
