@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.4.2 (2026-04-07)
+
+### Bug Fixes
+
+- **sync**: Consolidate agent selection logic and simplify sync flow
+  ([`c0a72c5`](https://github.com/timmyb824/one-skills-manager/commit/c0a72c5ef3a9f08c6dd8069473736241ba3c34c5))
+
+
 ## v1.4.1 (2026-04-07)
 
 ### Chores
