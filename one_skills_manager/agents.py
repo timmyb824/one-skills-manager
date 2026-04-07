@@ -21,7 +21,7 @@ class Agent:
 _AGENT_DEFS: list[tuple[str, str, str, str, str]] = [
     # (id, display name, skills path, rules path, mcp config path)
     ("claude-code", "Claude Code", "~/.claude/skills", "~/.claude/rules", "~/.claude.json"),
-    ("cursor", "Cursor", "~/.cursor/skills", "~/.cursor/rules", "~/.cursor.json"),
+    ("cursor", "Cursor", "~/.cursor/skills", "~/.cursor/rules", "~/.cursor/mcp.json"),
     ("windsurf", "Windsurf", "~/.codeium/windsurf/skills", "~/.codeium/windsurf/memories", "~/.codeium/windsurf/mcp_config.json"),
     ("codex", "OpenAI Codex", "~/.codex/skills", "~/.codex/rules", "~/.codex.json"),
 ]

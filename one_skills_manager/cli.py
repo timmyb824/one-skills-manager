@@ -793,7 +793,7 @@ def rule_remove(rule: str) -> None:
 
 
 @cli.command("import")
-@click.argument("source", type=click.Choice(["claude-code", "windsurf"]))
+@click.argument("source", type=click.Choice(["claude-code", "cursor", "windsurf"]))
 @click.option("--dry-run", is_flag=True, help="Preview what would be imported")
 def cmd_import(source: str, dry_run: bool) -> None:
     """Import existing configuration from an AI agent."""
@@ -814,6 +814,18 @@ def cmd_import(source: str, dry_run: bool) -> None:
         rules_path = Path("~/.claude/rules").expanduser()
         skills_path = Path("~/.claude/skills").expanduser()
         agent_id = "claude-code"
+    elif source == "cursor":
+        from .importers.cursor import (
+            import_mcp_servers as import_mcp,
+            import_rules as import_rules_fn,
+            import_skills as import_skills_fn,
+            suggest_profile_config,
+        )
+
+        mcp_path = Path("~/.cursor/mcp.json").expanduser()
+        rules_path = None  # Cursor stores rules in cloud
+        skills_path = Path("~/.cursor/skills").expanduser()
+        agent_id = "cursor"
     else:
         from .importers.windsurf import (
             import_mcp_servers as import_mcp,
@@ -859,10 +871,10 @@ def cmd_import(source: str, dry_run: bool) -> None:
         preview_rules = []
         existing_rules = []
         # Scan rules (handle both directory and single file)
-        if rules_path.exists():
+        if rules_path and rules_path.exists():
             if rules_path.is_file():
                 # Windsurf: single global_rules.md file
-                rule_name = "windsurf-global-rules.md"
+                rule_name = f"{agent_id}-global-rules.md"
                 dest_file = config.rules_dir / rule_name
                 if dest_file.exists() or rule_name in config.rules:
                     existing_rules.append(rule_name)
@@ -932,23 +944,44 @@ def cmd_import(source: str, dry_run: bool) -> None:
     # Import MCP servers
     imported_servers = import_mcp(mcp_path, mcp_config)
 
-    imported_rules = import_rules_fn(rules_path, config.rules_dir)
     # Import rules
-    for rule_name in imported_rules:
-        if rule_name not in config.rules:
-            if source == "claude-code":
+    imported_rules = []
+    if rules_path:
+        imported_rules = import_rules_fn(rules_path, config.rules_dir)
+        for rule_name in imported_rules:
+            if rule_name not in config.rules:
+                if source == "claude-code":
+                    record = RuleRecord(
+                        name=rule_name,
+                        source=str(rules_path / rule_name),
+                        agents=[agent_id],
+                    )
+                else:
+                    record = RuleRecord(
+                        name=rule_name,
+                        source=str(rules_path),
+                        agents=[agent_id],
+                    )
+                config.add_rule(record)
+    elif source == "cursor":
+        # Cursor: create placeholder global rules file
+        imported_rules = import_rules_fn(None, config.rules_dir)
+        if imported_rules:
+            rule_name = imported_rules[0]
+            if rule_name not in config.rules:
                 record = RuleRecord(
                     name=rule_name,
-                    source=str(rules_path / rule_name),
+                    source=str(config.rules_dir / rule_name),
                     agents=[agent_id],
                 )
-            else:
-                record = RuleRecord(
-                    name=rule_name,
-                    source=str(rules_path),
-                    agents=[agent_id],
-                )
-            config.add_rule(record)
+                config.add_rule(record)
+            console.print(
+                "\n[yellow]Note:[/yellow] Cursor stores rules in the cloud. "
+                "A placeholder file has been created at:\n"
+                f"  {config.rules_dir / rule_name}\n"
+                "Add your rules there, and they will be displayed during sync "
+                "for you to copy into Cursor settings."
+            )
     # Report results
     console.print("\n[green]✓[/green] Import complete")
     console.print(f"  • Imported {len(imported_skills)} skills")

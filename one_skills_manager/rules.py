@@ -88,6 +88,71 @@ def sync_windsurf_global_rules(config: Config, dry_run: bool = False) -> str:
     return "linked"
 
 
+def sync_cursor_global_rules(config: Config, dry_run: bool = False) -> str:
+    """Display Cursor rules for manual copy to Cursor settings.
+
+    Cursor stores rules in the cloud, so we display them in a copy-friendly
+    format for users to paste into Cursor settings.
+    """
+    source_file = config.rules_dir / "cursor-global-rules.md"
+
+    # Create source file if it doesn't exist
+    if not source_file.exists():
+        if not dry_run:
+            config.rules_dir.mkdir(parents=True, exist_ok=True)
+            template = (
+                "# Cursor Global Rules\n\n"
+                "**Note:** Cursor stores user rules in the cloud and they can only be "
+                "set via Cursor settings.\n\n"
+                "This file serves as a source of truth for your Cursor rules. "
+                "Add your rules here, and when you sync,\n"
+                "they will be displayed in a copy-friendly format for you to paste "
+                "into Cursor settings.\n\n"
+                "## Your Rules\n\n"
+                "Add your rules below:\n\n"
+            )
+            source_file.write_text(template)
+        return "created-template"
+
+    # Read rules content (skip the header/instructions)
+    content = source_file.read_text()
+    lines = content.split("\n")
+
+    rules_start = next(
+        (
+            i + 1
+            for i, line in enumerate(lines)
+            if line.strip().startswith("## Your Rules")
+        ),
+        0,
+    )
+    # Extract actual rules (skip empty lines at start)
+    rules_lines = lines[rules_start:]
+    while rules_lines and not rules_lines[0].strip():
+        rules_lines.pop(0)
+
+    rules_content = "\n".join(rules_lines).strip()
+
+    if not rules_content or rules_content == "Add your rules below:":
+        return "no-rules-defined"
+
+    # Display rules in copy-friendly format
+    from rich.console import Console
+    from rich.panel import Panel
+
+    console = Console()
+    console.print(
+        "\n[bold yellow]Cursor Rules (Copy to Cursor Settings):[/bold yellow]"
+    )
+    console.print(Panel(rules_content, border_style="cyan", padding=(1, 2)))
+    console.print(
+        "[dim]Copy the above rules and paste them into Cursor Settings → "
+        "Settings → Rules, Skills, Subagents[/dim]\n"
+    )
+
+    return "displayed-for-manual-copy"
+
+
 def sync_rule(
     rule_name: str, agent_id: str, config: Config, dry_run: bool = False
 ) -> str:
@@ -95,6 +160,10 @@ def sync_rule(
     # Special handling for Windsurf's global rules file
     if agent_id == "windsurf":
         return sync_windsurf_global_rules(config, dry_run)
+
+    # Special handling for Cursor's cloud-based rules
+    if agent_id == "cursor":
+        return sync_cursor_global_rules(config, dry_run)
 
     rule_path = config.rules_dir / rule_name
     if not rule_path.exists():
