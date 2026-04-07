@@ -62,7 +62,11 @@ def sync_skill(
         ]
 
     results: list[SyncResult] = []
-    agents_to_sync = [agent_filter] if agent_filter else record.agents
+    # If agent_filter is set, only sync if skill is assigned to that agent
+    if agent_filter:
+        agents_to_sync = [agent_filter] if agent_filter in record.agents else []
+    else:
+        agents_to_sync = record.agents
 
     for agent_id in agents_to_sync:
         try:
@@ -127,7 +131,13 @@ def sync_rules_all(
     results: list[SyncResult] = []
 
     for rule_record in config.rules.values():
-        agents_to_sync = [agent_filter] if agent_filter else rule_record.agents
+        # If agent_filter is set, only sync if rule is assigned to that agent
+        if agent_filter:
+            agents_to_sync = (
+                [agent_filter] if agent_filter in rule_record.agents else []
+            )
+        else:
+            agents_to_sync = rule_record.agents
 
         for agent_id in agents_to_sync:
             try:
