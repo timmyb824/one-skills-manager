@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.0 (2026-04-07)
+
+### Features
+
+- **profile**: Add server exclusion commands for agents
+  ([`9c3cd25`](https://github.com/timmyb824/one-skills-manager/commit/9c3cd256f11703a35c042876a8fea73ca4254659))
+
+
 ## v1.2.0 (2026-04-06)
 
 ### Features
