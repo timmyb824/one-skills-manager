@@ -1107,10 +1107,12 @@ def cmd_sync(
 
     # Determine which agents to sync to
     agents_to_sync = []
+    profile = profiles.get_active_profile()
+
     if agent:
         # Explicit agent specified
         agents_to_sync = [agent]
-    elif profile := profiles.get_active_profile():
+    elif profile:
         # Use agents from active profile
         agents_to_sync = [
             agent_id
