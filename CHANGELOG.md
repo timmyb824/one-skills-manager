@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.4.4 (2026-04-09)
+
+### Refactoring
+
+- Enhance profile show output with agent details
+  ([`a7e5f72`](https://github.com/timmyb824/one-skills-manager/commit/a7e5f7239389e4246e4827006080b7f7d75b3f34))
+
+
 ## v1.4.3 (2026-04-07)
 
 ### Bug Fixes
