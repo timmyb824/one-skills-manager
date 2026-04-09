@@ -291,34 +291,55 @@ def profile_show(name: str | None) -> None:
     if profile_name == profiles.active_profile:
         console.print("[green]  (active)[/green]")
 
-    console.print(f"\n[bold]MCP Servers ({len(profile.mcp_servers)}):[/bold]")
-    if profile.mcp_servers:
-        for server, transport in profile.mcp_servers.items():
-            console.print(f"  • {server} → {transport}")
-    else:
-        console.print("  [dim]None configured[/dim]")
-
     console.print("\n[bold]Agents:[/bold]")
     if profile.agents:
         for agent_id, agent_cfg in profile.agents.items():
             status = "enabled" if agent_cfg.enabled else "disabled"
-            console.print(f"  • {agent_id}: {status} (scope: {agent_cfg.mcp_scope})")
+            console.print(
+                f"  • [cyan]{agent_id}[/cyan]: {status} (scope: {agent_cfg.mcp_scope})"
+            )
+
+            # Calculate effective servers for this agent
+            effective_servers = {}
+            exclusions = profile.agent_exclusions.get(agent_id, set())
+
+            for server, transport in profile.mcp_servers.items():
+                if server not in exclusions:
+                    # Check for agent-specific override
+                    if (
+                        agent_id in profile.agent_overrides
+                        and server in profile.agent_overrides[agent_id]
+                    ):
+                        effective_servers[server] = profile.agent_overrides[agent_id][
+                            server
+                        ]
+                    else:
+                        effective_servers[server] = transport
+
+            # Display effective servers
+            if effective_servers:
+                console.print(f"    [dim]MCP Servers ({len(effective_servers)}):[/dim]")
+                for server, transport in effective_servers.items():
+                    # Show if it has an override
+                    override_marker = ""
+                    if (
+                        agent_id in profile.agent_overrides
+                        and server in profile.agent_overrides[agent_id]
+                    ):
+                        override_marker = " [yellow](override)[/yellow]"
+                    console.print(f"      • {server} → {transport}{override_marker}")
+            else:
+                console.print("    [dim]MCP Servers: None[/dim]")
+
+            # Show exclusions if any
+            if exclusions:
+                console.print(
+                    f"    [dim]Excluded ({len(exclusions)}):[/dim] {', '.join(sorted(exclusions))}"
+                )
+
+            console.print()  # Blank line between agents
     else:
         console.print("  [dim]None configured[/dim]")
-
-    if profile.agent_overrides:
-        console.print("\n[bold]Agent-Specific Transport Overrides:[/bold]")
-        for agent_id, overrides in profile.agent_overrides.items():
-            console.print(f"  [cyan]{agent_id}:[/cyan]")
-            for server, transport in overrides.items():
-                console.print(f"    • {server} → {transport}")
-
-    if profile.agent_exclusions:
-        console.print("\n[bold]Agent-Specific Server Exclusions:[/bold]")
-        for agent_id, exclusions in profile.agent_exclusions.items():
-            console.print(f"  [cyan]{agent_id}:[/cyan]")
-            for server in exclusions:
-                console.print(f"    • {server} [dim](excluded)[/dim]")
 
 
 @profile_group.command("set-override")
