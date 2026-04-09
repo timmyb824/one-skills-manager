@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.5.1 (2026-04-09)
+
+### Bug Fixes
+
+- Simplify agent synchronization logic in CLI
+  ([`d881421`](https://github.com/timmyb824/one-skills-manager/commit/d881421f3d2ea9d450d2036a295ff4aee5680214))
+
+
 ## v1.5.0 (2026-04-09)
 
 ### Features
