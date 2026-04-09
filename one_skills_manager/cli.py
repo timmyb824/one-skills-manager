@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 import json
 from pathlib import Path
+from datetime import datetime, timezone
 
 import click
 from rich.console import Console
@@ -295,8 +296,30 @@ def profile_show(name: str | None) -> None:
     if profile.agents:
         for agent_id, agent_cfg in profile.agents.items():
             status = "enabled" if agent_cfg.enabled else "disabled"
+
+            if last_sync := profile.last_synced.get(agent_id):
+                try:
+                    dt = datetime.fromisoformat(last_sync)
+
+                    now = datetime.now(timezone.utc)
+                    delta = now - dt
+
+                    if delta.days > 0:
+                        time_ago = f"{delta.days}d ago"
+                    elif delta.seconds >= 3600:
+                        time_ago = f"{delta.seconds // 3600}h ago"
+                    elif delta.seconds >= 60:
+                        time_ago = f"{delta.seconds // 60}m ago"
+                    else:
+                        time_ago = "just now"
+                    sync_info = f" [dim](synced {time_ago})[/dim]"
+                except Exception:  # noqa: BLE001
+                    sync_info = " [dim](synced)[/dim]"
+            else:
+                sync_info = " [yellow](never synced)[/yellow]"
+
             console.print(
-                f"  • [cyan]{agent_id}[/cyan]: {status} (scope: {agent_cfg.mcp_scope})"
+                f"  • [cyan]{agent_id}[/cyan]: {status} (scope: {agent_cfg.mcp_scope}){sync_info}"
             )
 
             # Calculate effective servers for this agent
@@ -1143,6 +1166,15 @@ def cmd_sync(
             table.add_row(r.skill, r.agent, f"[{color}]{r.action}{detail}[/{color}]")
 
         console.print(table)
+
+        # Update last_synced timestamp for each agent that was synced
+        if profile and not dry_run:
+            from datetime import datetime, timezone
+
+            timestamp = datetime.now(timezone.utc).isoformat()
+            for agent_id in agents_to_sync:
+                profile.last_synced[agent_id] = timestamp
+            profiles.save()
 
 
 # ---------------------------------------------------------------------------

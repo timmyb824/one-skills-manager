@@ -43,6 +43,9 @@ class Profile:
 
     Agent exclusions allow excluding specific servers from specific agents
     (e.g., when an agent has a built-in version of that server).
+
+    Last synced tracks when each agent was last synced to help identify
+    stale configurations.
     """
 
     name: str
@@ -50,6 +53,7 @@ class Profile:
     agents: dict[str, AgentConfig] = field(default_factory=dict)
     agent_overrides: dict[str, dict[str, str]] = field(default_factory=dict)
     agent_exclusions: dict[str, list[str]] = field(default_factory=dict)
+    last_synced: dict[str, str] = field(default_factory=dict)
 
     def is_server_excluded(self, server_name: str, agent_id: str) -> bool:
         """Check if a server is excluded for a specific agent.
@@ -102,6 +106,9 @@ class Profile:
         # Only include agent_exclusions if not empty
         if self.agent_exclusions:
             data["agent_exclusions"] = self.agent_exclusions
+        # Only include last_synced if not empty
+        if self.last_synced:
+            data["last_synced"] = self.last_synced
         return data
 
     @classmethod
@@ -116,6 +123,7 @@ class Profile:
             },
             agent_overrides=data.get("agent_overrides", {}),
             agent_exclusions=data.get("agent_exclusions", {}),
+            last_synced=data.get("last_synced", {}),
         )
 
 
