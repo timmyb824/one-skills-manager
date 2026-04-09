@@ -209,12 +209,7 @@ def sync_mcp_servers(
             )
 
         # Select renderer based on agent type
-        if agent_id == "windsurf":
-            renderer = windsurf
-        else:
-            # Default to claude_code renderer (works for claude-code, cursor, codex)
-            renderer = claude_code
-
+        renderer = windsurf if agent_id == "windsurf" else claude_code
         # Render MCP config with agent-specific transport resolution
         mcp_servers_config = renderer.render_mcp_config(
             profile, mcp_config, agent_id=agent_id
