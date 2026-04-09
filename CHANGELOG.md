@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.5.0 (2026-04-09)
+
+### Features
+
+- Track last synced timestamps for agents
+  ([`20541b6`](https://github.com/timmyb824/one-skills-manager/commit/20541b62cc87878415cf65bc9ae993e8977ea98d))
+
+
 ## v1.4.4 (2026-04-09)
 
 ### Refactoring
