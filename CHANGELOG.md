@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.6.0 (2026-04-10)
+
+### Features
+
+- Add support for Codex configuration import/export
+  ([`0f02c37`](https://github.com/timmyb824/one-skills-manager/commit/0f02c37b6c6fb3e54240d6dddfb0b0e4d52bb793))
+
+
 ## v1.5.1 (2026-04-09)
 
 ### Bug Fixes
