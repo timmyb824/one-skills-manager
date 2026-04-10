@@ -10,7 +10,7 @@ from .config import Config, SkillRecord
 from .dryrun import DryRunCollector
 from .mcp import MCPConfig
 from .profiles import ProfileConfig
-from .renderers import claude_code, windsurf
+from .renderers import claude_code, codex, windsurf
 from .rules import sync_rule as sync_rule_impl
 
 
@@ -208,33 +208,54 @@ def sync_mcp_servers(
                 detail="; ".join(errors),
             )
 
-        # Select renderer based on agent type
-        renderer = windsurf if agent_id == "windsurf" else claude_code
-        # Render MCP config with agent-specific transport resolution
-        mcp_servers_config = renderer.render_mcp_config(
-            profile, mcp_config, agent_id=agent_id
-        )
-
-        # Merge with existing config
-        merged_config, backup_path = renderer.merge_with_existing(
-            mcp_servers_config, agent.mcp_config_path, dry_run
-        )
-
-        if dry_run and collector:
-            if backup_path:
-                collector.add_backup(str(agent.mcp_config_path), backup_path)
-
-            server_list = ", ".join(profile.mcp_servers.keys())
-            collector.add_file_modification(
-                str(agent.mcp_config_path),
-                f"Add/update {len(profile.mcp_servers)} MCP servers: {server_list}",
+        # Codex uses TOML format, others use JSON
+        if agent_id == "codex":
+            # Use Codex-specific TOML renderer
+            action_detail = codex.write_mcp_config(
+                profile, mcp_config, agent.mcp_config_path, dry_run
             )
 
-        # Write config
-        renderer.write_config(merged_config, agent.mcp_config_path, dry_run)
+            if dry_run and collector:
+                server_list = ", ".join(profile.mcp_servers.keys())
+                collector.add_file_modification(
+                    str(agent.mcp_config_path),
+                    f"Add/update {len(profile.mcp_servers)} MCP servers: {server_list}",
+                )
 
-        action = "would-update" if dry_run else "updated"
-        detail = f"{len(profile.mcp_servers)} servers configured"
+            action = "would-update" if dry_run else "updated"
+            detail = (
+                action_detail.split(" — ")[1]
+                if " — " in action_detail
+                else action_detail
+            )
+        else:
+            # JSON-based agents (claude-code, cursor, windsurf)
+            renderer = windsurf if agent_id == "windsurf" else claude_code
+            # Render MCP config with agent-specific transport resolution
+            mcp_servers_config = renderer.render_mcp_config(
+                profile, mcp_config, agent_id=agent_id
+            )
+
+            # Merge with existing config
+            merged_config, backup_path = renderer.merge_with_existing(
+                mcp_servers_config, agent.mcp_config_path, dry_run
+            )
+
+            if dry_run and collector:
+                if backup_path:
+                    collector.add_backup(str(agent.mcp_config_path), backup_path)
+
+                server_list = ", ".join(profile.mcp_servers.keys())
+                collector.add_file_modification(
+                    str(agent.mcp_config_path),
+                    f"Add/update {len(profile.mcp_servers)} MCP servers: {server_list}",
+                )
+
+            # Write config
+            renderer.write_config(merged_config, agent.mcp_config_path, dry_run)
+
+            action = "would-update" if dry_run else "updated"
+            detail = f"{len(profile.mcp_servers)} servers configured"
 
         return SyncResult(
             skill="mcp-servers", agent=agent_id, action=action, detail=detail
