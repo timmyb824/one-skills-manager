@@ -23,7 +23,7 @@ _AGENT_DEFS: list[tuple[str, str, str, str, str]] = [
     ("claude-code", "Claude Code", "~/.claude/skills", "~/.claude/rules", "~/.claude.json"),
     ("cursor", "Cursor", "~/.cursor/skills", "~/.cursor/rules", "~/.cursor/mcp.json"),
     ("windsurf", "Windsurf", "~/.codeium/windsurf/skills", "~/.codeium/windsurf/memories", "~/.codeium/windsurf/mcp_config.json"),
-    ("codex", "OpenAI Codex", "~/.codex/skills", "~/.codex/rules", "~/.codex.json"),
+    ("codex", "Codex", "~/.agents/skills", "~/.codex/rules", "~/.codex/config.toml"),
 ]
 # fmt: on
 

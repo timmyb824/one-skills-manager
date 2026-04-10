@@ -837,7 +837,9 @@ def rule_remove(rule: str) -> None:
 
 
 @cli.command("import")
-@click.argument("source", type=click.Choice(["claude-code", "cursor", "windsurf"]))
+@click.argument(
+    "source", type=click.Choice(["claude-code", "cursor", "windsurf", "codex"])
+)
 @click.option("--dry-run", is_flag=True, help="Preview what would be imported")
 def cmd_import(source: str, dry_run: bool) -> None:
     """Import existing configuration from an AI agent."""
@@ -870,6 +872,18 @@ def cmd_import(source: str, dry_run: bool) -> None:
         rules_path = None  # Cursor stores rules in cloud
         skills_path = Path("~/.cursor/skills").expanduser()
         agent_id = "cursor"
+    elif source == "codex":
+        from .importers.codex import (
+            import_mcp_servers as import_mcp,
+            import_rules as import_rules_fn,
+            import_skills as import_skills_fn,
+            suggest_profile_config,
+        )
+
+        mcp_path = Path("~/.codex/config.toml").expanduser()
+        rules_path = Path("~/.codex/rules").expanduser()
+        skills_path = Path("~/.agents/skills").expanduser()
+        agent_id = "codex"
     else:
         from .importers.windsurf import (
             import_mcp_servers as import_mcp,
@@ -902,9 +916,18 @@ def cmd_import(source: str, dry_run: bool) -> None:
         preview_servers = []
         existing_servers = []
         if mcp_path.exists():
+            if source == "codex":
+                # TOML format
+                import tomllib
 
-            data = json.loads(mcp_path.read_text(encoding="utf-8"))
-            mcp_servers = data.get("mcpServers", {})
+                with open(mcp_path, "rb") as f:
+                    data = tomllib.load(f)
+                mcp_servers = data.get("mcp_servers", {})
+            else:
+                # JSON format
+                data = json.loads(mcp_path.read_text(encoding="utf-8"))
+                mcp_servers = data.get("mcpServers", {})
+
             for server_name, _ in mcp_servers.items():
                 if server_name in mcp_config.servers:
                     existing_servers.append(server_name)
@@ -925,8 +948,10 @@ def cmd_import(source: str, dry_run: bool) -> None:
                 else:
                     preview_rules.append(rule_name)
             else:
-                # Claude Code: directory of rule files
-                for rule_file in rules_path.rglob("*.md"):
+                # Directory of rule files
+                # Codex uses .rules extension, others use .md
+                pattern = "*.rules" if source == "codex" else "*.md"
+                for rule_file in rules_path.rglob(pattern):
                     if rule_file.is_file():
                         rel_path = rule_file.relative_to(rules_path)
                         rule_name = str(rel_path)
