@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.7.0 (2026-04-11)
+
+### Features
+
+- **docs**: Enhance README with new features, quick start guide, and core concepts section
+  ([`444702b`](https://github.com/timmyb824/one-skills-manager/commit/444702b428ca4f4c544158269c78aafd1395ec15))
+
+
 ## v1.6.0 (2026-04-10)
 
 ### Features
