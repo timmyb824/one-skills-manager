@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from .common import build_transport_config
+
 if TYPE_CHECKING:
     from one_skills_manager.mcp import MCPConfig
     from one_skills_manager.profiles import Profile
@@ -33,7 +35,7 @@ def render_mcp_config(profile: Profile, mcp_config: MCPConfig) -> dict[str, Any]
     """
     mcp_servers = {}
 
-    for server_name, transport_name in profile.mcp_servers.items():
+    for server_name in profile.mcp_servers:
         # Skip if excluded for codex
         if profile.is_server_excluded(server_name, "codex"):
             continue
@@ -47,24 +49,7 @@ def render_mcp_config(profile: Profile, mcp_config: MCPConfig) -> dict[str, Any]
             server_name, transport_name_for_agent
         )
 
-        server_config: dict[str, Any] = {}
-
-        if transport.type == "stdio":
-            # STDIO server
-            if transport.command:
-                server_config["command"] = transport.command
-            if transport.args:
-                server_config["args"] = transport.args
-            if transport.env:
-                server_config["env"] = transport.env
-        elif transport.type in ("sse", "http"):
-            # HTTP/SSE server
-            if transport.url:
-                server_config["url"] = transport.url
-            if transport.headers:
-                server_config["headers"] = transport.headers
-
-        if server_config:
+        if server_config := build_transport_config(transport):
             mcp_servers[server_name] = server_config
 
     return {"mcp_servers": mcp_servers}
