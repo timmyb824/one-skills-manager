@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.8.0 (2026-04-16)
+
+### Code Style
+
+- Pre-commit clean up and format changes
+  ([`881a4cc`](https://github.com/timmyb824/one-skills-manager/commit/881a4cc3f8cd5cc73bfce46e697687d2efc3ae41))
+
+### Features
+
+- Add support for path expansion when syncing mcp servers to providers
+  ([`d936210`](https://github.com/timmyb824/one-skills-manager/commit/d936210c1109c13151704e3159e82970333d6954))
+
+
 ## v1.7.0 (2026-04-11)
 
 ### Features
