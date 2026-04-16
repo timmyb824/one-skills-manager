@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -10,6 +11,19 @@ from typing import Any
 
 from ..mcp import MCPConfig, MCPTransport
 from ..profiles import Profile
+
+
+def _expand_path_variables(value: str) -> str:
+    """Expand environment variables and home references in a string value.
+
+    Args:
+        value: Raw string value that may contain shell-like variables
+
+    Returns:
+        Expanded string value
+    """
+    expanded = os.path.expandvars(value)
+    return os.path.expanduser(expanded)
 
 
 def build_transport_config(transport: MCPTransport) -> dict[str, Any]:
@@ -25,16 +39,24 @@ def build_transport_config(transport: MCPTransport) -> dict[str, Any]:
 
     if transport.type == "stdio":
         if transport.command:
-            server_config["command"] = transport.command
+            server_config["command"] = _expand_path_variables(transport.command)
         if transport.args:
-            server_config["args"] = transport.args
+            server_config["args"] = [
+                _expand_path_variables(arg) for arg in transport.args
+            ]
         if transport.env:
-            server_config["env"] = transport.env
+            server_config["env"] = {
+                key: _expand_path_variables(value)
+                for key, value in transport.env.items()
+            }
     elif transport.type in ("sse", "http"):
         if transport.url:
-            server_config["url"] = transport.url
+            server_config["url"] = _expand_path_variables(transport.url)
         if transport.headers:
-            server_config["headers"] = transport.headers
+            server_config["headers"] = {
+                key: _expand_path_variables(value)
+                for key, value in transport.headers.items()
+            }
 
     return server_config
 
