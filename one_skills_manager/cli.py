@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import sys
 import json
-from pathlib import Path
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 import click
 from rich.console import Console
@@ -849,10 +849,10 @@ def cmd_import(source: str, dry_run: bool) -> None:
 
     # Set paths based on source
     if source == "claude-code":
+        from .importers.claude_code import import_mcp_servers as import_mcp
+        from .importers.claude_code import import_rules as import_rules_fn
+        from .importers.claude_code import import_skills as import_skills_fn
         from .importers.claude_code import (
-            import_mcp_servers as import_mcp,
-            import_rules as import_rules_fn,
-            import_skills as import_skills_fn,
             suggest_profile_config,
         )
 
@@ -861,10 +861,10 @@ def cmd_import(source: str, dry_run: bool) -> None:
         skills_path = Path("~/.claude/skills").expanduser()
         agent_id = "claude-code"
     elif source == "cursor":
+        from .importers.cursor import import_mcp_servers as import_mcp
+        from .importers.cursor import import_rules as import_rules_fn
+        from .importers.cursor import import_skills as import_skills_fn
         from .importers.cursor import (
-            import_mcp_servers as import_mcp,
-            import_rules as import_rules_fn,
-            import_skills as import_skills_fn,
             suggest_profile_config,
         )
 
@@ -873,10 +873,10 @@ def cmd_import(source: str, dry_run: bool) -> None:
         skills_path = Path("~/.cursor/skills").expanduser()
         agent_id = "cursor"
     elif source == "codex":
+        from .importers.codex import import_mcp_servers as import_mcp
+        from .importers.codex import import_rules as import_rules_fn
+        from .importers.codex import import_skills as import_skills_fn
         from .importers.codex import (
-            import_mcp_servers as import_mcp,
-            import_rules as import_rules_fn,
-            import_skills as import_skills_fn,
             suggest_profile_config,
         )
 
@@ -885,10 +885,10 @@ def cmd_import(source: str, dry_run: bool) -> None:
         skills_path = Path("~/.agents/skills").expanduser()
         agent_id = "codex"
     else:
+        from .importers.windsurf import import_mcp_servers as import_mcp
+        from .importers.windsurf import import_rules as import_rules_fn
+        from .importers.windsurf import import_skills as import_skills_fn
         from .importers.windsurf import (
-            import_mcp_servers as import_mcp,
-            import_rules as import_rules_fn,
-            import_skills as import_skills_fn,
             suggest_profile_config,
         )
 

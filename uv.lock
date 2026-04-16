@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.13"
 
 [[package]]
@@ -387,7 +387,7 @@ wheels = [
 
 [[package]]
 name = "one-skills-manager"
-version = "1.5.1"
+version = "1.7.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

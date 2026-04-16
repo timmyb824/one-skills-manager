@@ -6,8 +6,8 @@ import json
 import shutil
 from pathlib import Path
 
-from ..mcp import MCPConfig, MCPServer, MCPTransport
 from ..config import SkillRecord
+from ..mcp import MCPConfig, MCPServer, MCPTransport
 
 
 def import_mcp_servers(source_path: Path, mcp_config: MCPConfig) -> list[str]:

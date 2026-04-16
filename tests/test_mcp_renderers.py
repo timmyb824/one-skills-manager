@@ -5,7 +5,10 @@ import pytest
 from one_skills_manager.mcp import MCPConfig, MCPServer, MCPTransport
 from one_skills_manager.profiles import Profile
 from one_skills_manager.renderers import codex
-from one_skills_manager.renderers.common import build_transport_config, render_mcp_servers
+from one_skills_manager.renderers.common import (
+    build_transport_config,
+    render_mcp_servers,
+)
 
 
 def _make_mcp_config(transport: MCPTransport) -> MCPConfig:
@@ -94,10 +97,10 @@ def test_codex_render_mcp_config_expands_values(
 
     rendered = codex.render_mcp_config(profile, mcp_config)
 
-    assert rendered["mcp_servers"]["filesystem"]["command"] == "/tmp/home-user/bin/fs-mcp"
-    assert rendered["mcp_servers"]["filesystem"]["args"] == [
-        "/tmp/home-user/documents"
-    ]
+    assert (
+        rendered["mcp_servers"]["filesystem"]["command"] == "/tmp/home-user/bin/fs-mcp"
+    )
+    assert rendered["mcp_servers"]["filesystem"]["args"] == ["/tmp/home-user/documents"]
 
 
 def test_build_transport_config_expands_http_fields(
