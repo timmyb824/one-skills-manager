@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.8.1 (2026-04-17)
+
+### Bug Fixes
+
+- Exclude servers for agents during MCP sync
+  ([`725252d`](https://github.com/timmyb824/one-skills-manager/commit/725252ddda99d3aa5ce4c1ca503ee9427a00ffa0))
+
+
 ## v1.8.0 (2026-04-16)
 
 ### Code Style
