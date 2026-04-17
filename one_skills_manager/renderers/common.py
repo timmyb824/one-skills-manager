@@ -81,6 +81,10 @@ def render_mcp_servers(
     mcp_servers = {}
 
     for server_name in profile.mcp_servers.keys():
+        # Skip if excluded for this agent
+        if agent_id and profile.is_server_excluded(server_name, agent_id):
+            continue
+
         # Use agent-specific transport if available, otherwise use default
         if agent_id:
             transport_name = profile.get_transport_for_agent(server_name, agent_id)

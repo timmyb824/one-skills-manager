@@ -241,21 +241,24 @@ def sync_mcp_servers(
                 mcp_servers_config, agent.mcp_config_path, dry_run
             )
 
+            # Count actual servers (excluding excluded ones)
+            actual_server_count = len(mcp_servers_config)
+
             if dry_run and collector:
                 if backup_path:
                     collector.add_backup(str(agent.mcp_config_path), backup_path)
 
-                server_list = ", ".join(profile.mcp_servers.keys())
+                server_list = ", ".join(mcp_servers_config.keys())
                 collector.add_file_modification(
                     str(agent.mcp_config_path),
-                    f"Add/update {len(profile.mcp_servers)} MCP servers: {server_list}",
+                    f"Add/update {actual_server_count} MCP servers: {server_list}",
                 )
 
             # Write config
             renderer.write_config(merged_config, agent.mcp_config_path, dry_run)
 
             action = "would-update" if dry_run else "updated"
-            detail = f"{len(profile.mcp_servers)} servers configured"
+            detail = f"{actual_server_count} servers configured"
 
         return SyncResult(
             skill="mcp-servers", agent=agent_id, action=action, detail=detail
