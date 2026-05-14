@@ -20,10 +20,41 @@ class Agent:
 # fmt: off
 _AGENT_DEFS: list[tuple[str, str, str, str, str]] = [
     # (id, display name, skills path, rules path, mcp config path)
-    ("claude-code", "Claude Code", "~/.claude/skills", "~/.claude/rules", "~/.claude.json"),
-    ("cursor", "Cursor", "~/.cursor/skills", "~/.cursor/rules", "~/.cursor/mcp.json"),
-    ("windsurf", "Windsurf", "~/.codeium/windsurf/skills", "~/.codeium/windsurf/memories", "~/.codeium/windsurf/mcp_config.json"),
-    ("codex", "Codex", "~/.agents/skills", "~/.codex/rules", "~/.codex/config.toml"),
+    (
+        "claude-code",
+        "Claude Code",
+        "~/.claude/skills",
+        "~/.claude/rules",
+        "~/.claude.json",
+    ),
+    (
+        "cursor",
+        "Cursor",
+        "~/.cursor/skills",
+        "~/.cursor/rules",
+        "~/.cursor/mcp.json",
+    ),
+    (
+        "windsurf",
+        "Windsurf",
+        "~/.codeium/windsurf/skills",
+        "~/.codeium/windsurf/memories",
+        "~/.codeium/windsurf/mcp_config.json",
+    ),
+    (
+        "codex",
+        "Codex",
+        "~/.agents/skills",
+        "~/.codex/rules",
+        "~/.codex/config.toml",
+    ),
+    (
+        "shared",
+        "Shared .agents",
+        "~/.agents/skills",
+        "~/.agents/rules",
+        "~/.agents/mcp.json",
+    ),
 ]
 # fmt: on
 

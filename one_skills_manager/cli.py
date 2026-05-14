@@ -755,7 +755,8 @@ def rule_unassign(rule: str, agent: str) -> None:
         sys.exit(1)
 
     config.unassign_rule_from_agent(rule, agent)
-    action = unsync_rule(rule, agent)
+    remaining_agents = config.rules[rule].agents
+    action = unsync_rule(rule, agent, assigned_agents=remaining_agents)
     console.print(f"[green]✓[/green] {rule} ✗ {agent} ({action})")
 
 
@@ -816,7 +817,7 @@ def rule_remove(rule: str) -> None:
     if agents_to_unsync := list(record.agents):
         console.print(f"Removing rule [bold]{rule}[/bold] from agents:")
         for agent_id in agents_to_unsync:
-            action = unsync_rule(rule, agent_id)
+            action = unsync_rule(rule, agent_id, force=True)
             if action == "removed":
                 console.print(
                     f"  [green]✓[/green] Unsynced from [cyan]{agent_id}[/cyan]"
@@ -1358,7 +1359,7 @@ def skill_unassign(skill: str, agent: str) -> None:
 
     config.unassign_agent(skill, agent)
     record = config.skills[skill]
-    result = unsync_skill(record, agent)
+    result = unsync_skill(record, agent, force=False)
     icon = "[green]✓[/green]" if result.action != "error" else "[red]✗[/red]"
     msg = result.detail if result.action == "error" else result.action
     console.print(f"{icon} {skill} ✗ {agent} ({msg})")
@@ -1379,7 +1380,7 @@ def skill_remove(skill: str) -> None:
     if agents_to_unsync := list(record.agents):
         console.print(f"Removing skill [bold]{skill}[/bold] from agents:")
         for agent_id in agents_to_unsync:
-            result = unsync_skill(record, agent_id)
+            result = unsync_skill(record, agent_id, force=True)
             if result.action == "removed":
                 console.print(
                     f"  [green]✓[/green] Unsynced from [cyan]{agent_id}[/cyan]"

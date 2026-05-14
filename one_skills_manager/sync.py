@@ -100,8 +100,18 @@ def sync_all(config: Config, agent_filter: str | None = None) -> list[SyncResult
     return results
 
 
-def unsync_skill(record: SkillRecord, agent_id: str) -> SyncResult:
-    """Remove the symlink for a specific agent."""
+def unsync_skill(record: SkillRecord, agent_id: str, force: bool = False) -> SyncResult:
+    """Remove a skill symlink for a specific agent.
+
+    Args:
+        record: Skill record being unsynced
+        agent_id: Agent ID to unsync from
+        force: If True, always remove the symlink even if another assigned
+            agent maps to the same physical link path
+
+    Returns:
+        SyncResult describing the action taken
+    """
     try:
         agent = get_agent(agent_id)
     except ValueError as exc:
@@ -111,6 +121,25 @@ def unsync_skill(record: SkillRecord, agent_id: str) -> SyncResult:
 
     link = agent.skills_dir / record.name
     if link.is_symlink():
+        if not force:
+            for other_agent_id in record.agents:
+                if other_agent_id == agent_id:
+                    continue
+
+                try:
+                    other_agent = get_agent(other_agent_id)
+                except ValueError:
+                    continue
+
+                other_link = other_agent.skills_dir / record.name
+                if other_link == link:
+                    return SyncResult(
+                        skill=record.name,
+                        agent=agent_id,
+                        action="preserved-shared-link",
+                        detail=(f"link shared with assigned agent '{other_agent_id}'"),
+                    )
+
         link.unlink()
         return SyncResult(skill=record.name, agent=agent_id, action="removed")
     return SyncResult(
@@ -180,6 +209,14 @@ def sync_mcp_servers(
     collector: DryRunCollector | None = None,
 ) -> SyncResult:
     """Sync MCP servers for a specific agent based on active profile."""
+    if agent_id == "shared":
+        return SyncResult(
+            skill="mcp-servers",
+            agent=agent_id,
+            action="skipped",
+            detail="MCP sync not supported for shared",
+        )
+
     profile = profile_config.get_active_profile()
     if not profile:
         return SyncResult(
