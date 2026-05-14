@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.9.0 (2026-05-14)
+
+### Features
+
+- **agents**: Add support for shared .agents target in agent management and synchronization
+  ([`9abe18c`](https://github.com/timmyb824/one-skills-manager/commit/9abe18c9a06ff208c281c9f1477508261d1fcc02))
+
+- **sync**: Prevent removal of shared symlinks when unassigning skills and rules
+  ([`092e356`](https://github.com/timmyb824/one-skills-manager/commit/092e35673c5e720733427e2c3f330602f9d6ce3d))
+
+
 ## v1.8.1 (2026-04-17)
 
 ### Bug Fixes
