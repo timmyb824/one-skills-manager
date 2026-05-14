@@ -197,6 +197,14 @@ def sync_mcp_servers(
             detail="Agent not enabled in profile",
         )
 
+    if agent_id == "shared":
+        return SyncResult(
+            skill="mcp-servers",
+            agent=agent_id,
+            action="skipped",
+            detail="MCP sync not supported for shared",
+        )
+
     try:
         agent = get_agent(agent_id)
 

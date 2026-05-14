@@ -8,7 +8,7 @@
                                                                |___/
 ```
 
-Manage and sync AI agent skills, rules, and MCP servers across Claude Code, Cursor, Windsurf, and Codex from a single central store.
+Manage and sync AI agent skills, rules, and MCP servers across Claude Code, Cursor, Windsurf, Codex, and shared `.agents` targets from a single central store.
 
 **Features:**
 
@@ -224,12 +224,15 @@ one-skills --version
 
 ## Supported Agents
 
-| ID            | Name        | Skills                       | Rules                          | MCP Config                            |
-| ------------- | ----------- | ---------------------------- | ------------------------------ | ------------------------------------- |
-| `claude-code` | Claude Code | `~/.claude/skills`           | `~/.claude/rules`              | `~/.claude.json`                      |
-| `cursor`      | Cursor      | `~/.cursor/skills`           | Cloud-based                    | `~/.cursor/mcp.json`                  |
-| `windsurf`    | Windsurf    | `~/.codeium/windsurf/skills` | `~/.codeium/windsurf/memories` | `~/.codeium/windsurf/mcp_config.json` |
-| `codex`       | Codex       | `~/.agents/skills`           | `~/.codex/rules`               | `~/.codex/config.toml`                |
+| ID            | Name           | Skills                       | Rules                          | MCP Config                            |
+| ------------- | -------------- | ---------------------------- | ------------------------------ | ------------------------------------- |
+| `claude-code` | Claude Code    | `~/.claude/skills`           | `~/.claude/rules`              | `~/.claude.json`                      |
+| `cursor`      | Cursor         | `~/.cursor/skills`           | Cloud-based                    | `~/.cursor/mcp.json`                  |
+| `windsurf`    | Windsurf       | `~/.codeium/windsurf/skills` | `~/.codeium/windsurf/memories` | `~/.codeium/windsurf/mcp_config.json` |
+| `codex`       | Codex          | `~/.agents/skills`           | `~/.codex/rules`               | `~/.codex/config.toml`                |
+| `shared`      | Shared .agents | `~/.agents/skills`           | `~/.agents/rules`              | _Not synced_                          |
+
+`shared` is a sync target for shared skills/rules only. MCP sync is intentionally skipped for this agent.
 
 ## MCP Server Transports
 
