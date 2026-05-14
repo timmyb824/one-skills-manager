@@ -4,7 +4,14 @@ from pathlib import Path
 
 from one_skills_manager.agents import Agent
 from one_skills_manager.config import Config, SkillRecord
-from one_skills_manager.sync import _link_skill, sync_skill, unsync_skill
+from one_skills_manager.mcp import MCPConfig
+from one_skills_manager.profiles import ProfileConfig
+from one_skills_manager.sync import (
+    _link_skill,
+    sync_mcp_servers,
+    sync_skill,
+    unsync_skill,
+)
 
 
 def _make_config(tmp_path: Path) -> Config:
@@ -125,3 +132,31 @@ def test_sync_missing_skill_dir_returns_error(tmp_path: Path) -> None:
     config.add_skill(record)
     results = sync_skill(record, config)
     assert results[0].action == "error"
+
+
+def test_sync_mcp_servers_shared_skips_without_profile(tmp_path: Path) -> None:
+    """Shared MCP sync should skip unconditionally and avoid file writes."""
+    from one_skills_manager import agents as agents_module
+
+    placeholder_mcp_path = tmp_path / "shared-mcp.json"
+    original = agents_module.AGENTS.copy()
+    agents_module.AGENTS["shared"] = Agent(
+        id="shared",
+        name="Shared .agents",
+        skills_dir=tmp_path / "shared-skills",
+        rules_dir=tmp_path / "shared-rules",
+        mcp_config_path=placeholder_mcp_path,
+    )
+
+    try:
+        profile_config = ProfileConfig()
+        mcp_config = MCPConfig()
+
+        result = sync_mcp_servers(profile_config, mcp_config, "shared")
+
+        assert result.action == "skipped"
+        assert result.detail == "MCP sync not supported for shared"
+        assert not placeholder_mcp_path.exists()
+    finally:
+        agents_module.AGENTS.clear()
+        agents_module.AGENTS.update(original)

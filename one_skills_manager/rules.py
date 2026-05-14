@@ -198,14 +198,43 @@ def sync_rule(
     return "linked"
 
 
-def unsync_rule(rule_name: str, agent_id: str, dry_run: bool = False) -> str:
-    """Remove rule symlink from agent. Returns action taken."""
+def unsync_rule(
+    rule_name: str,
+    agent_id: str,
+    dry_run: bool = False,
+    assigned_agents: list[str] | None = None,
+    force: bool = False,
+) -> str:
+    """Remove rule symlink from agent.
+
+    Args:
+        rule_name: Rule file name
+        agent_id: Agent to unsync from
+        dry_run: If True, do not modify filesystem
+        assigned_agents: Remaining assigned agents for this rule
+        force: If True, remove symlink even if shared with other assigned agents
+
+    Returns:
+        Action string describing what happened
+    """
     agent = get_agent(agent_id)
     link = agent.rules_dir / rule_name
 
     if dry_run:
         return "would-remove" if link.is_symlink() else "not-linked"
+
     if link.is_symlink():
+        if not force and assigned_agents:
+            for other_agent_id in assigned_agents:
+                try:
+                    other_agent = get_agent(other_agent_id)
+                except ValueError:
+                    continue
+
+                other_link = other_agent.rules_dir / rule_name
+                if other_link == link:
+                    return f"preserved-shared-link ({other_agent_id})"
+
         link.unlink()
         return "removed"
     return "not-linked"
