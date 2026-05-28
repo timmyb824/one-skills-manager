@@ -12,9 +12,9 @@ Manage and sync AI agent skills, rules, and MCP servers across Claude Code, Curs
 
 **Features:**
 
-- �️ **Interactive Mode** - Guided menu-driven UI for all common workflows
+- 🧭 **Interactive Mode** - Guided menu-driven UI for all common workflows
 - 📊 **Status Dashboard** - See exactly what's in sync at a glance
-- � **Skills** - Install once, symlink everywhere
+- 📦 **Skills** - Install once, symlink everywhere
 - 📝 **Rules** - Manage custom rules/memories across agents
 - 🔌 **MCP Servers** - Configure Model Context Protocol servers with guided wizard
 - 👤 **Profiles** - Different configurations for work, personal, etc.

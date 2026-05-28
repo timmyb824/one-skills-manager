@@ -1,371 +1,24 @@
-"""Interactive guided mode for one-skills-manager using questionary."""
+"""Guided interactive flows for skills, rules, MCP servers, profiles, and sync."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from pathlib import Path
 
 import questionary
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 
-from .agents import AGENT_IDS, get_agent
-from .config import Config
-from .mcp import MCPConfig, MCPTransport
-from .profiles import AgentConfig, ProfileConfig
-from .rules import install_rule, sync_rule
-from .skills import install
-from .sync import sync_all, sync_mcp_servers, sync_rules_all, sync_skill
+from ..agents import AGENT_IDS
+from ..config import Config
+from ..mcp import MCPConfig, MCPTransport
+from ..profiles import AgentConfig, ProfileConfig
+from ..rules import install_rule, sync_rule
+from ..skills import install
+from ..sync import SyncResult, sync_all, sync_mcp_servers, sync_rules_all, sync_skill
+from ._style import STYLE
+from .status import _check_skill_link
 
 console = Console()
-
-_STYLE = questionary.Style(
-    [
-        ("qmark", "fg:cyan bold"),
-        ("question", "bold"),
-        ("answer", "fg:green"),
-        ("pointer", "fg:cyan bold"),
-        ("highlighted", "fg:cyan bold"),
-        ("selected", "fg:green"),
-        ("separator", "fg:cyan"),
-        ("instruction", "fg:gray"),
-    ]
-)
-
-
-# ---------------------------------------------------------------------------
-# Public entry point
-# ---------------------------------------------------------------------------
-
-
-def run_interactive() -> None:
-    """Run the main interactive guided menu loop.
-
-    Presents a menu of common workflows and routes to the appropriate
-    guided flow. Returns when the user selects Exit or presses Ctrl-C.
-    """
-    console.print()
-    console.print(
-        Panel(
-            "[bold cyan]one-skills-manager[/bold cyan]  interactive mode\n"
-            "[dim]Use arrow keys to navigate, Enter to select, Ctrl-C to quit[/dim]",
-            border_style="cyan",
-            padding=(0, 2),
-        )
-    )
-    console.print()
-
-    while True:
-        try:
-            action = questionary.select(
-                "What would you like to do?",
-                choices=[
-                    questionary.Choice(
-                        "  Status — see what's installed and synced", "status"
-                    ),
-                    questionary.Choice("  Add skill", "add_skill"),
-                    questionary.Choice("  Add rule", "add_rule"),
-                    questionary.Choice("  Add MCP server", "add_mcp"),
-                    questionary.Choice("  Manage profile", "profile"),
-                    questionary.Choice("  Sync", "sync"),
-                    questionary.Separator(),
-                    questionary.Choice("  Exit", "exit"),
-                ],
-                style=_STYLE,
-            ).ask()
-        except KeyboardInterrupt:
-            action = None
-
-        if action is None or action == "exit":
-            console.print("[dim]Goodbye.[/dim]")
-            break
-
-        console.print()
-
-        try:
-            if action == "status":
-                _show_status()
-            elif action == "add_skill":
-                _guided_add_skill()
-            elif action == "add_rule":
-                _guided_add_rule()
-            elif action == "add_mcp":
-                _guided_add_mcp_server()
-            elif action == "profile":
-                _guided_manage_profile()
-            elif action == "sync":
-                _guided_sync()
-        except KeyboardInterrupt:
-            console.print("\n[dim]Cancelled.[/dim]")
-
-        console.print()
-
-
-# ---------------------------------------------------------------------------
-# Status display (shared with cli status command)
-# ---------------------------------------------------------------------------
-
-
-def _check_skill_link(skill_name: str, agent_id: str, skills_dir: Path) -> str:
-    """Check symlink state for a skill on a given agent.
-
-    Args:
-        skill_name: Name of the skill directory
-        agent_id: Agent ID to check
-        skills_dir: Central skills directory
-
-    Returns:
-        One of: 'linked', 'broken', 'missing', 'conflict', 'unknown'
-    """
-    try:
-        agent = get_agent(agent_id)
-    except ValueError:
-        return "unknown"
-
-    link = agent.skills_dir / skill_name
-    source = skills_dir / skill_name
-
-    if link.is_symlink():
-        return (
-            "linked"
-            if source.exists() and link.resolve() == source.resolve()
-            else "broken"
-        )
-    if link.exists():
-        return "conflict"
-    return "missing"
-
-
-def _check_rule_link(rule_name: str, agent_id: str, rules_dir: Path) -> str:
-    """Check symlink state for a rule on a given agent.
-
-    Args:
-        rule_name: Name of the rule file
-        agent_id: Agent ID to check
-        rules_dir: Central rules directory
-
-    Returns:
-        One of: 'linked', 'broken', 'missing', 'conflict', 'cloud', 'unknown'
-    """
-    if agent_id == "cursor":
-        return "cloud"
-
-    try:
-        agent = get_agent(agent_id)
-    except ValueError:
-        return "unknown"
-
-    if agent_id == "windsurf":
-        source = rules_dir / "windsurf-global-rules.md"
-        link = agent.rules_dir / "global_rules.md"
-    else:
-        source = rules_dir / rule_name
-        link = agent.rules_dir / rule_name
-
-    if link.is_symlink():
-        return (
-            "linked"
-            if source.exists() and link.resolve() == source.resolve()
-            else "broken"
-        )
-    if link.exists():
-        return "conflict"
-    return "missing"
-
-
-def _status_icon(state: str) -> str:
-    """Return a colored Rich markup icon for a sync state.
-
-    Args:
-        state: Sync state string
-
-    Returns:
-        Rich markup string with icon
-    """
-    mapping = {
-        "linked": "[green]✓[/green]",
-        "missing": "[yellow]○[/yellow]",
-        "broken": "[red]✗[/red]",
-        "conflict": "[red]![/red]",
-        "cloud": "[blue]☁[/blue]",
-        "unknown": "[dim]?[/dim]",
-    }
-    return mapping.get(state, "[dim]?[/dim]")
-
-
-def _relative_time(iso_ts: str) -> str:
-    """Convert an ISO timestamp to a human-readable relative time.
-
-    Args:
-        iso_ts: ISO 8601 timestamp string
-
-    Returns:
-        Human-readable relative time string like '2h ago'
-    """
-    try:
-        dt = datetime.fromisoformat(iso_ts)
-        delta = datetime.now(timezone.utc) - dt
-        if delta.days > 0:
-            return f"{delta.days}d ago"
-        if delta.seconds >= 3600:
-            return f"{delta.seconds // 3600}h ago"
-        if delta.seconds >= 60:
-            return f"{delta.seconds // 60}m ago"
-        return "just now"
-    except Exception:  # noqa: BLE001
-        return "unknown"
-
-
-def _show_status() -> bool:
-    """Display current sync status of all resources.
-
-    Returns:
-        True if everything is in sync, False if any item is out of sync.
-    """
-    config = Config.load()
-    profiles = ProfileConfig.load()
-    mcp_config = MCPConfig.load()
-
-    profile = profiles.get_active_profile()
-    profile_name = profiles.active_profile
-
-    all_in_sync = True
-
-    # ── Profile header ──────────────────────────────────────────────────────
-    if profile_name and profile:
-        agent_list = (
-            ", ".join(
-                f"[cyan]{a}[/cyan]" for a, cfg in profile.agents.items() if cfg.enabled
-            )
-            or "[dim]none[/dim]"
-        )
-
-        last_syncs = [_relative_time(ts) for ts in profile.last_synced.values() if ts]
-        sync_info = last_syncs[0] if last_syncs else "[yellow]never[/yellow]"
-
-        console.print(
-            f"[bold]Active profile:[/bold] [bold cyan]{profile_name}[/bold cyan]  "
-            f"│  Agents: {agent_list}  │  Last synced: {sync_info}"
-        )
-    else:
-        console.print(
-            "[yellow]No active profile set. Run:[/yellow] [cyan]one-skills profile create <name>[/cyan]"
-        )
-    console.print()
-
-    # ── Skills ──────────────────────────────────────────────────────────────
-    if config.skills:
-        skill_table = Table(
-            title="Skills", show_lines=False, show_header=True, header_style="bold"
-        )
-        skill_table.add_column("Name", style="bold", min_width=20)
-        skill_table.add_column("Agents / Status")
-
-        unsynced_skills = 0
-        for rec in config.skills.values():
-            if not rec.agents:
-                skill_table.add_row(rec.name, "[dim]not assigned[/dim]")
-                all_in_sync = False
-                unsynced_skills += 1
-                continue
-
-            parts = []
-            for aid in rec.agents:
-                state = _check_skill_link(rec.name, aid, config.skills_dir)
-                if state != "linked":
-                    all_in_sync = False
-                    unsynced_skills += 1
-                parts.append(f"{_status_icon(state)} {aid}")
-
-            skill_table.add_row(rec.name, "  ".join(parts))
-
-        console.print(skill_table)
-        console.print()
-    else:
-        console.print(
-            "[dim]No skills installed.[/dim]  [cyan]one-skills skill install <url>[/cyan]"
-        )
-        console.print()
-
-    # ── Rules ───────────────────────────────────────────────────────────────
-    if config.rules:
-        rule_table = Table(
-            title="Rules", show_lines=False, show_header=True, header_style="bold"
-        )
-        rule_table.add_column("Name", style="bold", min_width=20)
-        rule_table.add_column("Agents / Status")
-
-        for rec in config.rules.values():
-            if not rec.agents:
-                rule_table.add_row(rec.name, "[dim]not assigned[/dim]")
-                all_in_sync = False
-                continue
-
-            parts = []
-            for aid in rec.agents:
-                state = _check_rule_link(rec.name, aid, config.rules_dir)
-                if state not in ("linked", "cloud"):
-                    all_in_sync = False
-                parts.append(f"{_status_icon(state)} {aid}")
-
-            rule_table.add_row(rec.name, "  ".join(parts))
-
-        console.print(rule_table)
-        console.print()
-    else:
-        console.print(
-            "[dim]No rules installed.[/dim]  [cyan]one-skills rule install <file>[/cyan]"
-        )
-        console.print()
-
-    # ── MCP Servers ─────────────────────────────────────────────────────────
-    if mcp_config.servers:
-        mcp_table = Table(
-            title=f"MCP Servers{f'  (profile: {profile_name})' if profile_name else ''}",
-            show_lines=False,
-            show_header=True,
-            header_style="bold",
-        )
-        mcp_table.add_column("Server", style="bold cyan", min_width=20)
-        mcp_table.add_column("Profile", min_width=12)
-        mcp_table.add_column("Transports", style="dim")
-
-        for server in mcp_config.servers.values():
-            in_profile = profile and server.name in profile.mcp_servers
-            profile_cell = (
-                f"[green]✓[/green] {profile.mcp_servers[server.name]}"
-                if in_profile
-                else "[dim]—[/dim]"
-            )
-            transports = ", ".join(server.transports.keys()) or "[dim]none[/dim]"
-            mcp_table.add_row(server.name, profile_cell, transports)
-
-        console.print(mcp_table)
-        console.print()
-    else:
-        console.print(
-            "[dim]No MCP servers defined.[/dim]  [cyan]one-skills mcp add-server <name>[/cyan]"
-        )
-        console.print()
-
-    # ── Legend ───────────────────────────────────────────────────────────────
-    console.print(
-        "[green]✓[/green] synced  "
-        "[yellow]○[/yellow] not linked  "
-        "[red]✗[/red] broken  "
-        "[blue]☁[/blue] cloud (cursor)  "
-        "[red]![/red] conflict"
-    )
-
-    if all_in_sync:
-        console.print("\n[green]Everything is up to date.[/green]")
-    else:
-        console.print(
-            "\n[yellow]Some items are out of sync. Run:[/yellow] [cyan]one-skills sync[/cyan]"
-        )
-
-    return all_in_sync
 
 
 # ---------------------------------------------------------------------------
@@ -373,13 +26,13 @@ def _show_status() -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _guided_add_skill() -> None:
+def guided_add_skill() -> None:
     """Interactive flow: install a skill and assign it to agents."""
     config = Config.load()
 
     source = questionary.text(
         "Skill source (GitHub URL or local path):",
-        style=_STYLE,
+        style=STYLE,
     ).ask()
     if not source:
         return
@@ -396,7 +49,7 @@ def _guided_add_skill() -> None:
     selected = questionary.checkbox(
         "Assign to which agents? (space to select)",
         choices=AGENT_IDS,
-        style=_STYLE,
+        style=STYLE,
     ).ask()
     if not selected:
         console.print(
@@ -419,13 +72,13 @@ def _guided_add_skill() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _guided_add_rule() -> None:
+def guided_add_rule() -> None:
     """Interactive flow: install a rule and assign it to agents."""
     config = Config.load()
 
     source = questionary.path(
         "Rule file path:",
-        style=_STYLE,
+        style=STYLE,
     ).ask()
     if not source:
         return
@@ -433,7 +86,7 @@ def _guided_add_rule() -> None:
     selected = questionary.checkbox(
         "Assign to which agents? (space to select)",
         choices=AGENT_IDS,
-        style=_STYLE,
+        style=STYLE,
     ).ask()
     agent_list: list[str] = selected or []
 
@@ -460,16 +113,16 @@ def _guided_add_rule() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _guided_add_mcp_server_with_name(initial_name: str) -> None:
+def guided_add_mcp_server_with_name(initial_name: str) -> None:
     """Invoke the MCP server wizard with a pre-filled server name.
 
     Args:
         initial_name: Server name provided on the command line
     """
-    _guided_add_mcp_server(initial_name=initial_name)
+    guided_add_mcp_server(initial_name=initial_name)
 
 
-def _guided_add_mcp_server(initial_name: str | None = None) -> None:
+def guided_add_mcp_server(initial_name: str | None = None) -> None:
     """Interactive flow: add an MCP server with transport and optional profile assignment.
 
     Args:
@@ -483,7 +136,7 @@ def _guided_add_mcp_server(initial_name: str | None = None) -> None:
         name = initial_name
         console.print(f"[bold]Adding MCP server:[/bold] {name}")
     else:
-        name = questionary.text("Server name:", style=_STYLE).ask()
+        name = questionary.text("Server name:", style=STYLE).ask()
         if not name:
             return
 
@@ -494,7 +147,7 @@ def _guided_add_mcp_server(initial_name: str | None = None) -> None:
     description = questionary.text(
         "Description:",
         default=f"{name} MCP server",
-        style=_STYLE,
+        style=STYLE,
     ).ask()
     if description is None:
         return
@@ -502,7 +155,7 @@ def _guided_add_mcp_server(initial_name: str | None = None) -> None:
     transport_name = questionary.text(
         "Transport name (used when assigning to profiles):",
         default="default",
-        style=_STYLE,
+        style=STYLE,
     ).ask()
     if not transport_name:
         return
@@ -517,7 +170,7 @@ def _guided_add_mcp_server(initial_name: str | None = None) -> None:
             questionary.Choice("sse    — Server-Sent Events (remote URL)", "sse"),
             questionary.Choice("http   — HTTP stream (remote URL)", "http"),
         ],
-        style=_STYLE,
+        style=STYLE,
     ).ask()
     if not transport_type:
         return
@@ -528,19 +181,19 @@ def _guided_add_mcp_server(initial_name: str | None = None) -> None:
         pkg_mgr = questionary.select(
             "Package manager / launcher:",
             choices=["npx", "uvx", "command"],
-            style=_STYLE,
+            style=STYLE,
         ).ask()
         if not pkg_mgr:
             return
 
         if pkg_mgr in ("npx", "uvx"):
-            pkg = questionary.text(f"Package name for {pkg_mgr}:", style=_STYLE).ask()
+            pkg = questionary.text(f"Package name for {pkg_mgr}:", style=STYLE).ask()
             if not pkg:
                 return
             extra_args_str = questionary.text(
                 "Extra arguments (space-separated, leave blank for none):",
                 default="",
-                style=_STYLE,
+                style=STYLE,
             ).ask()
             extra_args = (
                 extra_args_str.split()
@@ -556,33 +209,33 @@ def _guided_add_mcp_server(initial_name: str | None = None) -> None:
                     type="stdio", command="uvx", args=[pkg, *extra_args]
                 )
         else:
-            cmd = questionary.text("Command:", style=_STYLE).ask()
+            cmd = questionary.text("Command:", style=STYLE).ask()
             if not cmd:
                 return
             args_str = questionary.text(
                 "Arguments (space-separated, leave blank for none):",
                 default="",
-                style=_STYLE,
+                style=STYLE,
             ).ask()
             args = args_str.split() if args_str and args_str.strip() else []
             transport = MCPTransport(type="stdio", command=cmd, args=args)
 
     else:
-        url = questionary.text(f"URL for {transport_type}:", style=_STYLE).ask()
+        url = questionary.text(f"URL for {transport_type}:", style=STYLE).ask()
         if not url:
             return
         transport = MCPTransport(type=transport_type, url=url)
 
     # ── Optional env vars ─────────────────────────────────────────────────
     if questionary.confirm(
-        "Add environment variables?", default=False, style=_STYLE
+        "Add environment variables?", default=False, style=STYLE
     ).ask():
         env: dict[str, str] = {}
         while True:
-            key = questionary.text("Key (blank to finish):", style=_STYLE).ask()
+            key = questionary.text("Key (blank to finish):", style=STYLE).ask()
             if not key:
                 break
-            value = questionary.text(f"Value for {key}:", style=_STYLE).ask()
+            value = questionary.text(f"Value for {key}:", style=STYLE).ask()
             if value is None:
                 break
             env[key] = value
@@ -593,7 +246,8 @@ def _guided_add_mcp_server(initial_name: str | None = None) -> None:
     mcp_config.add_server(name, description)
     mcp_config.add_transport(name, transport_name, transport)
     console.print(
-        f"\n[green]✓[/green] Created MCP server [bold]{name}[/bold] with {transport_name} ({transport_type}) transport"
+        f"\n[green]✓[/green] Created MCP server [bold]{name}[/bold] "
+        f"with {transport_name} ({transport_type}) transport"
     )
 
     # ── Optional: add to profile ──────────────────────────────────────────
@@ -601,7 +255,7 @@ def _guided_add_mcp_server(initial_name: str | None = None) -> None:
         if questionary.confirm(
             f"Add to active profile '{profiles.active_profile}'?",
             default=True,
-            style=_STYLE,
+            style=STYLE,
         ).ask():
             try:
                 profiles.add_server_to_profile(
@@ -624,14 +278,14 @@ def _guided_add_mcp_server(initial_name: str | None = None) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _guided_manage_profile() -> None:
+def guided_manage_profile() -> None:
     """Interactive flow: manage profile agents and MCP server assignments."""
     profiles = ProfileConfig.load()
     mcp_config = MCPConfig.load()
 
     if not profiles.profiles:
         console.print("[yellow]No profiles yet.[/yellow]")
-        name = questionary.text("Create a new profile named:", style=_STYLE).ask()
+        name = questionary.text("Create a new profile named:", style=STYLE).ask()
         if not name:
             return
         profiles.create_profile(name)
@@ -645,7 +299,7 @@ def _guided_manage_profile() -> None:
     selected_profile = questionary.select(
         "Select profile:",
         choices=profile_choices,
-        style=_STYLE,
+        style=STYLE,
     ).ask()
     if not selected_profile:
         return
@@ -653,7 +307,6 @@ def _guided_manage_profile() -> None:
     profile = profiles.profiles[selected_profile]
 
     while True:
-        # Build a summary to show state
         agents_str = ", ".join(profile.agents.keys()) if profile.agents else "none"
         servers_str = (
             ", ".join(profile.mcp_servers.keys()) if profile.mcp_servers else "none"
@@ -675,7 +328,7 @@ def _guided_manage_profile() -> None:
                 questionary.Separator(),
                 questionary.Choice("Done", "done"),
             ],
-            style=_STYLE,
+            style=STYLE,
         ).ask()
 
         if not action or action == "done":
@@ -689,7 +342,7 @@ def _guided_manage_profile() -> None:
             selected = questionary.checkbox(
                 "Select agents to add:",
                 choices=available,
-                style=_STYLE,
+                style=STYLE,
             ).ask()
             if selected:
                 for aid in selected:
@@ -705,7 +358,7 @@ def _guided_manage_profile() -> None:
             selected = questionary.checkbox(
                 "Select agents to remove:",
                 choices=list(profile.agents.keys()),
-                style=_STYLE,
+                style=STYLE,
             ).ask()
             if selected:
                 for aid in selected:
@@ -721,7 +374,7 @@ def _guided_manage_profile() -> None:
             server_name = questionary.select(
                 "Select server to add:",
                 choices=available,
-                style=_STYLE,
+                style=STYLE,
             ).ask()
             if not server_name:
                 continue
@@ -734,7 +387,7 @@ def _guided_manage_profile() -> None:
             transport_choice = questionary.select(
                 f"Transport for {server_name}:",
                 choices=transports,
-                style=_STYLE,
+                style=STYLE,
             ).ask()
             if transport_choice:
                 profiles.add_server_to_profile(
@@ -751,7 +404,7 @@ def _guided_manage_profile() -> None:
             selected = questionary.checkbox(
                 "Select servers to remove:",
                 choices=list(profile.mcp_servers.keys()),
-                style=_STYLE,
+                style=STYLE,
             ).ask()
             if selected:
                 for srv in selected:
@@ -770,8 +423,38 @@ def _guided_manage_profile() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _guided_sync() -> None:
-    """Interactive flow: run sync with guided options."""
+def _dry_run_skills(config: Config, agent_id: str) -> list[SyncResult]:
+    """Simulate skills sync for dry-run display without touching the filesystem.
+
+    Args:
+        config: Loaded Config instance
+        agent_id: Agent ID to simulate sync for
+
+    Returns:
+        List of SyncResult with would-* actions
+    """
+    action_map = {
+        "linked": "up-to-date",
+        "missing": "would-link",
+        "broken": "would-update",
+        "conflict": "would-skip (conflict)",
+        "unknown": "would-skip (unknown agent)",
+    }
+    results = []
+    for rec in config.skills.values():
+        if agent_id not in rec.agents:
+            continue
+        state = _check_skill_link(rec.name, agent_id, config.skills_dir)
+        results.append(
+            SyncResult(
+                skill=rec.name, agent=agent_id, action=action_map.get(state, state)
+            )
+        )
+    return results
+
+
+def guided_sync() -> None:
+    """Interactive flow: run sync with guided scope, agent, and dry-run options."""
     profiles = ProfileConfig.load()
     config = Config.load()
     mcp_config = MCPConfig.load()
@@ -799,7 +482,7 @@ def _guided_sync() -> None:
             questionary.Choice("Rules only", "rules"),
             questionary.Choice("MCP servers only", "mcp"),
         ],
-        style=_STYLE,
+        style=STYLE,
     ).ask()
     if not scope:
         return
@@ -812,7 +495,7 @@ def _guided_sync() -> None:
             ),
             questionary.Choice("Specific agent...", "specific"),
         ],
-        style=_STYLE,
+        style=STYLE,
     ).ask()
     if not agent_scope:
         return
@@ -821,7 +504,7 @@ def _guided_sync() -> None:
         agent_filter = questionary.select(
             "Select agent:",
             choices=profile_agents,
-            style=_STYLE,
+            style=STYLE,
         ).ask()
         if not agent_filter:
             return
@@ -829,24 +512,27 @@ def _guided_sync() -> None:
     else:
         agents_to_sync = profile_agents
 
-    dry_run = questionary.confirm("Dry-run first?", default=False, style=_STYLE).ask()
+    dry_run = questionary.confirm("Dry-run first?", default=False, style=STYLE).ask()
 
     console.print()
     if dry_run:
         console.print("[yellow]Dry-run mode (no changes will be made)[/yellow]")
 
-    all_results = []
+    all_results: list[SyncResult] = []
 
     for agent_id in agents_to_sync:
         if scope in ("all", "skills"):
-            results = sync_all(config, agent_filter=agent_id)
-            all_results.extend(results)
+            # Use dry-run simulation for skills so no symlinks are created/modified
+            if dry_run:
+                all_results.extend(_dry_run_skills(config, agent_id))
+            else:
+                all_results.extend(sync_all(config, agent_filter=agent_id))
         if scope in ("all", "rules"):
-            results = sync_rules_all(config, agent_id, dry_run)
-            all_results.extend(results)
+            all_results.extend(sync_rules_all(config, agent_id, dry_run))
         if scope in ("all", "mcp"):
-            result = sync_mcp_servers(profiles, mcp_config, agent_id, dry_run)
-            all_results.append(result)
+            all_results.append(
+                sync_mcp_servers(profiles, mcp_config, agent_id, dry_run)
+            )
 
     if not all_results:
         console.print("[dim]Nothing to sync.[/dim]")
