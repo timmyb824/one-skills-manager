@@ -12,9 +12,11 @@ Manage and sync AI agent skills, rules, and MCP servers across Claude Code, Curs
 
 **Features:**
 
-- 📦 **Skills** - Install once, symlink everywhere
+- �️ **Interactive Mode** - Guided menu-driven UI for all common workflows
+- 📊 **Status Dashboard** - See exactly what's in sync at a glance
+- � **Skills** - Install once, symlink everywhere
 - 📝 **Rules** - Manage custom rules/memories across agents
-- 🔌 **MCP Servers** - Configure Model Context Protocol servers
+- 🔌 **MCP Servers** - Configure Model Context Protocol servers with guided wizard
 - 👤 **Profiles** - Different configurations for work, personal, etc.
 - 📥 **Import** - Import existing configs from any agent
 - 🔄 **Sync Tracking** - Know when each agent was last synced
@@ -33,19 +35,26 @@ uv tool install one-skills-manager
 
 ## Quick Start
 
+The easiest way to get started is the interactive mode — just run the command with no arguments:
+
 ```bash
+one-skills
+```
+
+This launches a guided menu for every common workflow. Or use the direct commands:
+
+```bash
+# Check what's installed and in sync
+one-skills status
+
 # Import your existing Cursor configuration
-one-skills import cursor --dry-run # inspect what would be imported
+one-skills import cursor --dry-run  # inspect what would be imported
 one-skills import cursor
 
-# Create a profile
+# Create a profile and add agents
 one-skills profile create work
-
-# Add agents to your profile
 one-skills profile add-agent cursor --profile work
 one-skills profile add-agent windsurf --profile work
-
-# Activate the profile
 one-skills profile activate work
 
 # Sync everything to your active profile's agents
@@ -75,6 +84,41 @@ Everything is stored once in `~/.one-skills/`:
 When you sync, symlinks are created from each agent's directory to the central store.
 
 ## Usage
+
+### Interactive Mode
+
+Run `one-skills` with no arguments (or `one-skills ui`) to launch the interactive guided menu:
+
+```bash
+one-skills      # launch interactive mode
+one-skills ui   # explicit alias
+```
+
+The menu provides guided flows for:
+
+- **Status** — dashboard of everything installed and synced
+- **Add skill** — install from URL or local path, then choose agents interactively
+- **Add rule** — install a rule file, then choose agents interactively
+- **Add MCP server** — step-by-step wizard (transport type, package, env vars, profile assignment)
+- **Manage profile** — add/remove agents and MCP servers from a profile
+- **Sync** — choose scope (all/skills/rules/MCP) and agents, with optional dry-run
+
+### Status
+
+See the full state of your installation at a glance:
+
+```bash
+one-skills status
+```
+
+Output includes:
+
+- Active profile, enabled agents, and last synced time
+- Each skill with per-agent symlink status (`✓` synced, `○` not linked, `✗` broken)
+- Each rule with per-agent status (including `☁` for cloud-based Cursor rules)
+- MCP servers with profile assignment and available transports
+
+Exits with code **1** if anything is out of sync — useful as a `chezmoi` post-apply hook.
 
 ### Import Existing Configuration
 
@@ -119,11 +163,17 @@ one-skills profile delete personal
 ### Skills
 
 ```bash
-# Install from GitHub
+# Install from GitHub — prompts to choose agents interactively when run in a terminal
 one-skills skill install https://github.com/owner/repo/tree/main/skill-name
 
 # Install from local path
 one-skills skill install ~/my-skills/skill-name
+
+# Install and assign to specific agents (non-interactive / scripting)
+one-skills skill install https://github.com/owner/repo/tree/main/skill-name --agents cursor,windsurf
+
+# Install without assigning (skip the prompt)
+one-skills skill install ~/my-skills/skill-name --no-assign
 
 # List all skills
 one-skills list
@@ -141,11 +191,14 @@ one-skills skill remove skill-name
 ### Rules
 
 ```bash
-# Register an existing rule file
-one-skills rule register my-rule.md cursor,windsurf
+# Install a rule — prompts to choose agents interactively when run in a terminal
+one-skills rule install ~/rules/my-rule.md
 
-# Copy a rule from another location
-one-skills rule copy ~/rules/my-rule.md my-rule.md cursor
+# Install and assign to specific agents (non-interactive / scripting)
+one-skills rule install ~/rules/my-rule.md --agents claude-code,codex
+
+# Install without assigning (skip the prompt)
+one-skills rule install ~/rules/my-rule.md --no-assign
 
 # List all rules
 one-skills rule list
@@ -162,20 +215,32 @@ one-skills rule remove my-rule.md
 
 ### MCP Servers
 
+The easiest way to add a server is the guided wizard, which walks through transport type, package/URL, env vars, and profile assignment in one flow:
+
 ```bash
-# Add an MCP server with stdio transport
-one-skills mcp add-server my-server stdio \
-  --command npx \
-  --args "-y" "my-mcp-server"
+# Interactive wizard (prompts for all details)
+one-skills mcp add-server my-server
 
-# Add an MCP server with SSE transport
-one-skills mcp add-server my-server sse \
-  --url https://example.com/mcp
+# Non-interactive shortcuts for scripting
+one-skills mcp add-server my-server --npx @modelcontextprotocol/server-github
+one-skills mcp add-server my-server --uvx mcp-server-git --description "Git MCP"
+one-skills mcp add-server my-server --sse https://example.com/sse
+one-skills mcp add-server my-server --http https://example.com/mcp
 
+# Optionally assign to a profile in the same command
+one-skills mcp add-server my-server --npx my-pkg --profile personal
+```
+
+Other MCP commands:
+
+```bash
 # List all MCP servers
 one-skills mcp list
 
-# Add server to a profile
+# Show details for a server
+one-skills mcp show my-server
+
+# Add server to a profile (after creation)
 one-skills profile add-server my-server default --profile personal
 
 # Override transport for a specific agent
@@ -185,8 +250,10 @@ one-skills profile set-override cursor my-server docker --profile personal
 one-skills profile exclude-server cursor my-server --profile personal
 
 # Remove a server
-one-skills mcp remove-server my-server
+one-skills mcp remove my-server
 ```
+
+> **Low-level commands**: `one-skills mcp add` and `one-skills mcp add-transport` are still available for scripted/advanced use.
 
 ### Sync
 
@@ -215,8 +282,17 @@ one-skills sync --mcp-only
 ### Other Commands
 
 ```bash
+# Show sync status dashboard
+one-skills status
+
+# Launch interactive guided mode
+one-skills ui
+
 # List supported agents
 one-skills agents
+
+# List all installed resources
+one-skills list
 
 # Show version
 one-skills --version
@@ -285,7 +361,9 @@ one-skills sync
 2. **Profiles**: Define which agents and MCP servers are active for different contexts
 3. **Symlinks**: Skills and rules are symlinked from central storage to each agent's directory
 4. **MCP Rendering**: MCP configs are rendered per-agent based on profile settings
-5. **Sync Tracking**: Each agent tracks when it was last synced (visible in `profile show`)
+5. **Sync Tracking**: Each agent tracks when it was last synced (visible in `profile show` and `status`)
+6. **Interactive Mode**: `one-skills` (no args) launches a guided menu for all common workflows
+7. **Status Dashboard**: `one-skills status` shows symlink health and profile assignments; exits 1 if out of sync (useful for `chezmoi` hooks)
 
 ## Configuration Files
 
