@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.10.0 (2026-05-28)
+
+### Features
+
+- Add interactive UI mode with guided workflows and status command
+  ([`19d5a62`](https://github.com/timmyb824/one-skills-manager/commit/19d5a628852f8284345545a189c3d30ceb7f74c4))
+
+### Refactoring
+
+- **interactive**: Split into package, fix dry_run for skills, fix README emoji
+  ([`edca56b`](https://github.com/timmyb824/one-skills-manager/commit/edca56b25aaf085e522438c2f368573e61ba75a0))
+
+
 ## v1.9.0 (2026-05-14)
 
 ### Features
