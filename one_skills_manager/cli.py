@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import click
+import questionary
 from rich.console import Console
 from rich.table import Table
 
@@ -41,10 +42,15 @@ def _load_mcp() -> MCPConfig:
 # ---------------------------------------------------------------------------
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.version_option(package_name="one-skills-manager")
-def cli() -> None:
+@click.pass_context
+def cli(ctx: click.Context) -> None:
     """Manage and sync AI agent configurations across Claude Code, Cursor, Windsurf, and Codex."""
+    if ctx.invoked_subcommand is None:
+        from .interactive import run_interactive
+
+        run_interactive()
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +76,27 @@ def cmd_agents() -> None:
         )
 
     console.print(table)
+
+
+@cli.command("status")
+def cmd_status() -> None:
+    """Show sync status for all skills, rules, and MCP servers.
+
+    Exits with code 1 if any item is out of sync (useful for chezmoi hooks).
+    """
+    from .interactive import _show_status
+
+    in_sync = _show_status()
+    if not in_sync:
+        sys.exit(1)
+
+
+@cli.command("ui")
+def cmd_ui() -> None:
+    """Launch the interactive guided mode."""
+    from .interactive import run_interactive
+
+    run_interactive()
 
 
 # ---------------------------------------------------------------------------
@@ -230,8 +257,6 @@ def profile_add_agent(agent: str, profile: str | None, disabled: bool) -> None:
         sys.exit(1)
 
     try:
-        from .profiles import AgentConfig
-
         agent_config = AgentConfig(enabled=not disabled)
         profiles.add_agent_to_profile(profile_name, agent, agent_config)
         status = "disabled" if disabled else "enabled"
@@ -660,6 +685,119 @@ def mcp_show(name: str) -> None:
         console.print("[dim]No transports configured[/dim]")
 
 
+@mcp_group.command("add-server")
+@click.argument("name")
+@click.option("--description", default="", help="Server description")
+@click.option(
+    "--npx",
+    "pkg_npx",
+    default="",
+    help="npm package to run with npx (shortcut for stdio)",
+)
+@click.option(
+    "--uvx",
+    "pkg_uvx",
+    default="",
+    help="Python package to run with uvx (shortcut for stdio)",
+)
+@click.option(
+    "--sse", "url_sse", default="", help="SSE URL (shortcut for sse transport)"
+)
+@click.option(
+    "--http",
+    "url_http",
+    default="",
+    help="HTTP stream URL (shortcut for http transport)",
+)
+@click.option(
+    "--transport-name", default="default", show_default=True, help="Transport key name"
+)
+@click.option(
+    "--profile",
+    "profile_name",
+    default="",
+    help="Profile to add server to (default: active)",
+)
+def mcp_add_server_wizard(
+    name: str,
+    description: str,
+    pkg_npx: str,
+    pkg_uvx: str,
+    url_sse: str,
+    url_http: str,
+    transport_name: str,
+    profile_name: str,
+) -> None:
+    """Add an MCP server with guided transport setup.
+
+    When run without flags launches an interactive wizard.
+    Flags enable non-interactive scripted usage.
+
+    Examples:
+
+    \b
+      # Interactive wizard:
+      one-skills mcp add-server my-server
+
+      # Non-interactive (npx):
+      one-skills mcp add-server my-server --npx @modelcontextprotocol/server-github
+
+      # Non-interactive (uvx):
+      one-skills mcp add-server my-server --uvx mcp-server-git --description "Git MCP"
+
+      # Non-interactive (SSE):
+      one-skills mcp add-server my-server --sse https://example.com/sse
+    """
+    mcp_config = _load_mcp()
+
+    # Non-interactive shortcut paths
+    shortcut_transport: MCPTransport | None = None
+    if pkg_npx:
+        shortcut_transport = MCPTransport(
+            type="stdio", command="npx", args=["-y", pkg_npx]
+        )
+    elif pkg_uvx:
+        shortcut_transport = MCPTransport(type="stdio", command="uvx", args=[pkg_uvx])
+    elif url_sse:
+        shortcut_transport = MCPTransport(type="sse", url=url_sse)
+    elif url_http:
+        shortcut_transport = MCPTransport(type="http", url=url_http)
+
+    if shortcut_transport:
+        # Non-interactive: create server + transport, optionally add to profile
+        try:
+            mcp_config.add_server(name, description or f"{name} MCP server")
+            mcp_config.add_transport(name, transport_name, shortcut_transport)
+            console.print(
+                f"[green]✓[/green] Created [bold]{name}[/bold] "
+                f"({shortcut_transport.type} via {transport_name})"
+            )
+        except ValueError as exc:
+            err_console.print(f"[red]Error:[/red] {exc}")
+            sys.exit(1)
+
+        profiles = _load_profiles()
+        pname = profile_name or profiles.active_profile
+        if pname:
+            try:
+                profiles.add_server_to_profile(pname, name, transport_name)
+                console.print(f"[green]✓[/green] Added to profile [bold]{pname}[/bold]")
+            except ValueError as exc:
+                err_console.print(f"[yellow]Could not add to profile:[/yellow] {exc}")
+        return
+
+    # Interactive wizard
+    if not sys.stdin.isatty():
+        err_console.print(
+            "[red]No transport flags provided. Use --npx/--uvx/--sse/--http or run interactively.[/red]"
+        )
+        sys.exit(1)
+
+    from .interactive import _guided_add_mcp_server_with_name
+
+    _guided_add_mcp_server_with_name(name)
+
+
 # ---------------------------------------------------------------------------
 # rule commands
 # ---------------------------------------------------------------------------
@@ -678,7 +816,10 @@ def rule_group() -> None:
     default="",
     help=f"Comma-separated agent IDs. Valid: {', '.join(AGENT_IDS)}",
 )
-def rule_install(source: str, agents: str) -> None:
+@click.option(
+    "--no-assign", is_flag=True, help="Skip agent assignment without prompting"
+)
+def rule_install(source: str, agents: str, no_assign: bool) -> None:
     """Install a rule file."""
     agent_list: list[str] = [a.strip() for a in agents.split(",") if a.strip()]
 
@@ -692,14 +833,29 @@ def rule_install(source: str, agents: str) -> None:
     try:
         rule_name = install_rule(source, config, agent_list)
         console.print(f"[green]✓[/green] Installed rule [bold]{rule_name}[/bold]")
-
-        if agent_list:
-            for agent_id in agent_list:
-                action = sync_rule(rule_name, agent_id, config)
-                console.print(f"  → {agent_id}: {action}")
     except Exception as exc:  # noqa: BLE001
         err_console.print(f"[red]Error:[/red] {exc}")
         sys.exit(1)
+
+    # Prompt for agent assignment when not specified and running interactively
+    if not agent_list and not no_assign and sys.stdin.isatty():
+        selected = questionary.checkbox(
+            "Assign to which agents? (space to select, Enter to skip)",
+            choices=AGENT_IDS,
+        ).ask()
+        if selected:
+            agent_list = selected
+            for aid in agent_list:
+                config.assign_rule_to_agent(rule_name, aid)
+
+    if agent_list:
+        for agent_id in agent_list:
+            action = sync_rule(rule_name, agent_id, config)
+            console.print(f"  → {agent_id}: {action}")
+    elif not no_assign:
+        console.print(
+            f"  [dim]Assign later with:[/dim] [cyan]one-skills rule assign {rule_name} <agent>[/cyan]"
+        )
 
 
 @rule_group.command("list")
@@ -1197,8 +1353,6 @@ def cmd_sync(
 
         # Update last_synced timestamp for each agent that was synced
         if profile and not dry_run:
-            from datetime import datetime, timezone
-
             timestamp = datetime.now(timezone.utc).isoformat()
             for agent_id in agents_to_sync:
                 profile.last_synced[agent_id] = timestamp
@@ -1223,7 +1377,10 @@ def skill_group() -> None:
     default="",
     help=f"Comma-separated agent IDs. Valid: {', '.join(AGENT_IDS)}",
 )
-def skill_install(source: str, agents: str) -> None:
+@click.option(
+    "--no-assign", is_flag=True, help="Skip agent assignment without prompting"
+)
+def skill_install(source: str, agents: str, no_assign: bool) -> None:
     """Install a skill from a GitHub URL or local path."""
     agent_list: list[str] = [a.strip() for a in agents.split(",") if a.strip()]
 
@@ -1243,11 +1400,27 @@ def skill_install(source: str, agents: str) -> None:
 
     console.print(f"[green]✓[/green] Installed skill [bold]{record.name}[/bold]")
 
+    # Prompt for agent assignment when not specified and running interactively
+    if not agent_list and not no_assign and sys.stdin.isatty():
+        selected = questionary.checkbox(
+            "Assign to which agents? (space to select, Enter to skip)",
+            choices=AGENT_IDS,
+        ).ask()
+        if selected:
+            agent_list = selected
+            for aid in agent_list:
+                config.assign_agent(record.name, aid)
+            record = config.skills[record.name]
+
     if agent_list:
         results = sync_skill(record, config)
         for r in results:
             icon = "[green]✓[/green]" if r.action != "error" else "[red]✗[/red]"
             console.print(f"  {icon} synced to [cyan]{r.agent}[/cyan] ({r.action})")
+    elif not no_assign:
+        console.print(
+            f"  [dim]Assign later with:[/dim] [cyan]one-skills skill assign {record.name} <agent>[/cyan]"
+        )
 
 
 @skill_group.command("register")
