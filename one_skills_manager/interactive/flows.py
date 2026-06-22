@@ -12,9 +12,16 @@ from ..agents import AGENT_IDS
 from ..config import Config
 from ..mcp import MCPConfig, MCPTransport
 from ..profiles import AgentConfig, ProfileConfig
-from ..rules import install_rule, sync_rule
-from ..skills import install
-from ..sync import SyncResult, sync_all, sync_mcp_servers, sync_rules_all, sync_skill
+from ..rules import install_rule, remove_rule, sync_rule, unsync_rule
+from ..skills import install, remove
+from ..sync import (
+    SyncResult,
+    sync_all,
+    sync_mcp_servers,
+    sync_rules_all,
+    sync_skill,
+    unsync_skill,
+)
 from ._style import STYLE
 from .status import _check_skill_link
 
@@ -106,6 +113,144 @@ def guided_add_rule() -> None:
             "[dim]Rule installed without agent assignment. Assign later with:[/dim]"
         )
         console.print(f"  [cyan]one-skills rule assign {rule_name} <agent>[/cyan]")
+
+
+# ---------------------------------------------------------------------------
+# Guided: Remove skill
+# ---------------------------------------------------------------------------
+
+
+def guided_remove_skill() -> None:
+    """Interactive flow: remove an installed skill and unsync from agents."""
+    config = Config.load()
+
+    if not config.skills:
+        console.print("[yellow]No skills installed.[/yellow]")
+        return
+
+    skill_name = questionary.select(
+        "Select skill to remove:",
+        choices=sorted(config.skills.keys()),
+        style=STYLE,
+    ).ask()
+    if not skill_name:
+        return
+
+    record = config.skills[skill_name]
+    agents_list = record.agents[:]
+
+    confirmed = questionary.confirm(
+        f"Remove skill '{skill_name}' from all agents and central store?",
+        default=False,
+        style=STYLE,
+    ).ask()
+    if not confirmed:
+        console.print("[dim]Cancelled.[/dim]")
+        return
+
+    if agents_list:
+        console.print(f"Removing [bold]{skill_name}[/bold] from agents:")
+        for agent_id in agents_list:
+            result = unsync_skill(record, agent_id, force=True)
+            if result.action == "removed":
+                console.print(
+                    f"  [green]✓[/green] Unsynced from [cyan]{agent_id}[/cyan]"
+                )
+            else:
+                console.print(f"  [yellow]○[/yellow] {agent_id}: {result.action}")
+
+    remove(skill_name, config)
+    console.print(
+        f"\n[green]✓[/green] Removed skill [bold]{skill_name}[/bold] from central store"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Guided: Remove rule
+# ---------------------------------------------------------------------------
+
+
+def guided_remove_rule() -> None:
+    """Interactive flow: remove an installed rule and unsync from agents."""
+    config = Config.load()
+
+    if not config.rules:
+        console.print("[yellow]No rules installed.[/yellow]")
+        return
+
+    rule_name = questionary.select(
+        "Select rule to remove:",
+        choices=sorted(config.rules.keys()),
+        style=STYLE,
+    ).ask()
+    if not rule_name:
+        return
+
+    record = config.rules[rule_name]
+    agents_list = record.agents[:]
+
+    confirmed = questionary.confirm(
+        f"Remove rule '{rule_name}' from all agents and central store?",
+        default=False,
+        style=STYLE,
+    ).ask()
+    if not confirmed:
+        console.print("[dim]Cancelled.[/dim]")
+        return
+
+    if agents_list:
+        console.print(f"Removing [bold]{rule_name}[/bold] from agents:")
+        for agent_id in agents_list:
+            action = unsync_rule(rule_name, agent_id, force=True)
+            if action == "removed":
+                console.print(
+                    f"  [green]✓[/green] Unsynced from [cyan]{agent_id}[/cyan]"
+                )
+            else:
+                console.print(f"  [yellow]○[/yellow] {agent_id}: {action}")
+
+    remove_rule(rule_name, config)
+    config.remove_rule(rule_name)
+    console.print(
+        f"\n[green]✓[/green] Removed rule [bold]{rule_name}[/bold] from central store"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Guided: Remove MCP server
+# ---------------------------------------------------------------------------
+
+
+def guided_remove_mcp_server() -> None:
+    """Interactive flow: remove an MCP server definition and all its transports."""
+    mcp_config = MCPConfig.load()
+
+    if not mcp_config.servers:
+        console.print("[yellow]No MCP servers defined.[/yellow]")
+        return
+
+    server_name = questionary.select(
+        "Select MCP server to remove:",
+        choices=sorted(mcp_config.servers.keys()),
+        style=STYLE,
+    ).ask()
+    if not server_name:
+        return
+
+    confirmed = questionary.confirm(
+        f"Remove MCP server '{server_name}' and all its transports?",
+        default=False,
+        style=STYLE,
+    ).ask()
+    if not confirmed:
+        console.print("[dim]Cancelled.[/dim]")
+        return
+
+    try:
+        mcp_config.remove_server(server_name)
+        console.print(f"[green]✓[/green] Removed MCP server [bold]{server_name}[/bold]")
+    except ValueError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -220,12 +365,11 @@ def guided_add_mcp_server(initial_name: str | None = None) -> None:
             args = args_str.split() if args_str and args_str.strip() else []
             transport = MCPTransport(type="stdio", command=cmd, args=args)
 
-    else:
-        url = questionary.text(f"URL for {transport_type}:", style=STYLE).ask()
-        if not url:
-            return
+    elif url := questionary.text(f"URL for {transport_type}:", style=STYLE).ask():
         transport = MCPTransport(type=transport_type, url=url)
 
+    else:
+        return
     # ── Optional env vars ─────────────────────────────────────────────────
     if questionary.confirm(
         "Add environment variables?", default=False, style=STYLE
@@ -339,12 +483,11 @@ def guided_manage_profile() -> None:
             if not available:
                 console.print("[dim]All agents already in profile.[/dim]")
                 continue
-            selected = questionary.checkbox(
+            if selected := questionary.checkbox(
                 "Select agents to add:",
                 choices=available,
                 style=STYLE,
-            ).ask()
-            if selected:
+            ).ask():
                 for aid in selected:
                     profiles.add_agent_to_profile(
                         selected_profile, aid, AgentConfig(enabled=True)
@@ -355,12 +498,11 @@ def guided_manage_profile() -> None:
             if not profile.agents:
                 console.print("[dim]No agents in profile.[/dim]")
                 continue
-            selected = questionary.checkbox(
+            if selected := questionary.checkbox(
                 "Select agents to remove:",
                 choices=list(profile.agents.keys()),
                 style=STYLE,
-            ).ask()
-            if selected:
+            ).ask():
                 for aid in selected:
                     profile.agents.pop(aid, None)
                 profiles.save()
@@ -384,12 +526,11 @@ def guided_manage_profile() -> None:
                     f"[yellow]No transports defined for '{server_name}'.[/yellow]"
                 )
                 continue
-            transport_choice = questionary.select(
+            if transport_choice := questionary.select(
                 f"Transport for {server_name}:",
                 choices=transports,
                 style=STYLE,
-            ).ask()
-            if transport_choice:
+            ).ask():
                 profiles.add_server_to_profile(
                     selected_profile, server_name, transport_choice
                 )
@@ -401,12 +542,11 @@ def guided_manage_profile() -> None:
             if not profile.mcp_servers:
                 console.print("[dim]No servers in profile.[/dim]")
                 continue
-            selected = questionary.checkbox(
+            if selected := questionary.checkbox(
                 "Select servers to remove:",
                 choices=list(profile.mcp_servers.keys()),
                 style=STYLE,
-            ).ask()
-            if selected:
+            ).ask():
                 for srv in selected:
                     profiles.remove_server_from_profile(selected_profile, srv)
                 console.print(f"[green]✓[/green] Removed: {', '.join(selected)}")
