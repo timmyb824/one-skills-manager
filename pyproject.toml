@@ -15,7 +15,13 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Utilities",
 ]
-dependencies = ["click>=8.1", "rich>=13.0", "httpx>=0.27", "tomli-w>=1.0", "questionary>=2.0"]
+dependencies = [
+    "click>=8.1",
+    "rich>=13.0",
+    "httpx>=0.27",
+    "tomli-w>=1.0",
+    "questionary>=2.0",
+]
 
 [project.scripts]
 one-skills = "one_skills_manager.cli:cli"
@@ -73,3 +79,6 @@ upload_to_vcs_release = true
 upload_to_pypi = false
 remove_dist = false
 patch_without_tag = true
+
+[tool.flake8]
+max-line-length = 160

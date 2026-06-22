@@ -982,7 +982,6 @@ def rule_remove(rule: str) -> None:
                 console.print(f"  [yellow]○[/yellow] {agent_id}: {action}")
 
     remove_rule(rule, config)
-    config.remove_rule(rule)
     console.print(
         f"\n[green]✓[/green] Removed rule [bold]{rule}[/bold] from central store"
     )

@@ -241,7 +241,8 @@ def unsync_rule(
 
 
 def remove_rule(rule_name: str, config: Config) -> None:
-    """Remove rule from central store."""
+    """Remove rule from central store and config registry."""
     rule_path = config.rules_dir / rule_name
     if rule_path.exists():
         rule_path.unlink()
+    config.remove_rule(rule_name)

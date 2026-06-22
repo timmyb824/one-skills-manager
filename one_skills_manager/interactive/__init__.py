@@ -19,6 +19,9 @@ from .flows import (
     guided_add_rule,
     guided_add_skill,
     guided_manage_profile,
+    guided_remove_mcp_server,
+    guided_remove_rule,
+    guided_remove_skill,
     guided_sync,
 )
 from .status import show_status
@@ -66,6 +69,11 @@ def run_interactive() -> None:
                     questionary.Choice("  Add skill", "add_skill"),
                     questionary.Choice("  Add rule", "add_rule"),
                     questionary.Choice("  Add MCP server", "add_mcp"),
+                    questionary.Separator(),
+                    questionary.Choice("  Remove skill", "remove_skill"),
+                    questionary.Choice("  Remove rule", "remove_rule"),
+                    questionary.Choice("  Remove MCP server", "remove_mcp"),
+                    questionary.Separator(),
                     questionary.Choice("  Manage profile", "profile"),
                     questionary.Choice("  Sync", "sync"),
                     questionary.Separator(),
@@ -91,6 +99,12 @@ def run_interactive() -> None:
                 guided_add_rule()
             elif action == "add_mcp":
                 guided_add_mcp_server()
+            elif action == "remove_skill":
+                guided_remove_skill()
+            elif action == "remove_rule":
+                guided_remove_rule()
+            elif action == "remove_mcp":
+                guided_remove_mcp_server()
             elif action == "profile":
                 guided_manage_profile()
             elif action == "sync":
