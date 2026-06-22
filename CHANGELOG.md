@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.11.0 (2026-06-22)
+
+### Features
+
+- **interactive**: Add guided removal flows for skills, rules, and MCP servers
+  ([`f7beb1b`](https://github.com/timmyb824/one-skills-manager/commit/f7beb1b6c98ccb19ee6ae175191f991c82aaa72e))
+
+### Refactoring
+
+- **rules**: Consolidate rule removal logic and use named expressions
+  ([`525821d`](https://github.com/timmyb824/one-skills-manager/commit/525821d6a236b037ac515b71783d96fa33b59718))
+
+
 ## v1.10.0 (2026-05-28)
 
 ### Features
