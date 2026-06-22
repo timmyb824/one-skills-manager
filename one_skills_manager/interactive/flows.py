@@ -128,12 +128,13 @@ def guided_remove_skill() -> None:
         console.print("[yellow]No skills installed.[/yellow]")
         return
 
-    skill_name = questionary.select(
-        "Select skill to remove:",
-        choices=sorted(config.skills.keys()),
-        style=STYLE,
-    ).ask()
-    if not skill_name:
+    if not (
+        skill_name := questionary.select(
+            "Select skill to remove:",
+            choices=sorted(config.skills.keys()),
+            style=STYLE,
+        ).ask()
+    ):
         return
 
     record = config.skills[skill_name]
@@ -178,12 +179,13 @@ def guided_remove_rule() -> None:
         console.print("[yellow]No rules installed.[/yellow]")
         return
 
-    rule_name = questionary.select(
-        "Select rule to remove:",
-        choices=sorted(config.rules.keys()),
-        style=STYLE,
-    ).ask()
-    if not rule_name:
+    if not (
+        rule_name := questionary.select(
+            "Select rule to remove:",
+            choices=sorted(config.rules.keys()),
+            style=STYLE,
+        ).ask()
+    ):
         return
 
     record = config.rules[rule_name]
@@ -210,7 +212,6 @@ def guided_remove_rule() -> None:
                 console.print(f"  [yellow]○[/yellow] {agent_id}: {action}")
 
     remove_rule(rule_name, config)
-    config.remove_rule(rule_name)
     console.print(
         f"\n[green]✓[/green] Removed rule [bold]{rule_name}[/bold] from central store"
     )
